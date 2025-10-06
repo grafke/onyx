@@ -1,81 +1,70 @@
-# The following prompts are used for the initial response before a chat history exists
-# It is used also for the one shot direct QA flow
+# Vertimai į lietuvių kalbą. Svarbūs sentineliniai tokenai išlaikomi.
 import json
 
-from onyx.prompts.constants import DEFAULT_IGNORE_STATEMENT
-from onyx.prompts.constants import FINAL_QUERY_PAT
-from onyx.prompts.constants import GENERAL_SEP_PAT
-from onyx.prompts.constants import QUESTION_PAT
-from onyx.prompts.constants import THOUGHT_PAT
-
+from onyx.prompts.constants import DEFAULT_IGNORE_STATEMENT, FINAL_QUERY_PAT, GENERAL_SEP_PAT, QUESTION_PAT, THOUGHT_PAT
 
 ONE_SHOT_SYSTEM_PROMPT = """
-You are a question answering system that is constantly learning and improving.
-You can process and comprehend vast amounts of text and utilize this knowledge to provide \
-accurate and detailed answers to diverse queries.
+Jūs esate klausimų–atsakymų sistema, kuri nuolat mokosi ir tobulėja.
+Galite apdoroti didelius tekstų kiekius ir panaudoti šias žinias, kad pateiktumėte
+tikslius ir detalius atsakymus į įvairius klausimus.
 """.strip()
 
 ONE_SHOT_TASK_PROMPT = """
-Answer the final query below taking into account the context above where relevant. \
-Ignore any provided context that is not relevant to the query.
+Atsakykite į toliau pateiktą galutinę užklausą, atsižvelgdami į aukščiau pateiktą kontekstą.
+Ignoruokite bet kokį kontekstą, kuris nėra susijęs su užklausa.
 """.strip()
 
 
 WEAK_MODEL_SYSTEM_PROMPT = """
-Respond to the user query using the following reference document.
+Atsakykite į vartotojo užklausą, naudodamiesi toliau pateiktu atskaitos dokumentu.
 """.lstrip()
 
 WEAK_MODEL_TASK_PROMPT = """
-Answer the user query below based on the reference document above.
+Atsakykite į vartotojo užklausą remdamiesi aukščiau pateiktu atskaitos dokumentu.
 """
 
 
 REQUIRE_JSON = """
-You ALWAYS responds with ONLY a JSON containing an answer and quotes that support the answer.
+VISADA atsakykite TIK JSON formatu, kuriame yra atsakymas ir jį pagrindžiančios citatos.
 """.strip()
 
 
 JSON_HELPFUL_HINT = """
-Hint: Make the answer as DETAILED as possible and respond in JSON format! \
-Quotes MUST be EXACT substrings from provided documents!
+Užuomina: padarykite atsakymą kuo DETALESNĮ ir atsakykite JSON formatu!
+Citatos PRIVALO būti TIKSLIOS ištraukos iš pateiktų dokumentų!
 """.strip()
 
 CONTEXT_BLOCK = f"""
-REFERENCE DOCUMENTS:
+ATSKAITOS DOKUMENTAI:
 {GENERAL_SEP_PAT}
 {{context_docs_str}}
 {GENERAL_SEP_PAT}
 """
 
 HISTORY_BLOCK = f"""
-CONVERSATION HISTORY:
+POKALBIO ISTORIJA:
 {GENERAL_SEP_PAT}
 {{history_str}}
 {GENERAL_SEP_PAT}
 """
 
 
-# This has to be doubly escaped due to json containing { } which are also used for format strings
 EMPTY_SAMPLE_JSON = {
-    "answer": "Place your final answer here. It should be as DETAILED and INFORMATIVE as possible.",
+    "answer": "Čia pateikite galutinį atsakymą. Jis turi būti kuo DETALESNIS ir INFORMATYVESNIS.",
     "quotes": [
-        "each quote must be UNEDITED and EXACTLY as shown in the context documents!",
-        "HINT, quotes are not shown to the user!",
+        "kiekviena citata turi būti NEPAKEISTA ir TIKSLIAI tokia, kaip pateikta konteksto dokumentuose!",
+        "UŽUOMINA: citatos naudotojui nerodomos!",
     ],
 }
 
 
-# Default json prompt which can reference multiple docs and provide answer + quotes
-# system_like_header is similar to system message, can be user provided or defaults to QA_HEADER
-# context/history blocks are for context documents and conversation history, they can be blank
-# task prompt is the task message of the prompt, can be blank, there is no default
 JSON_PROMPT = f"""
 {{system_prompt}}
 {REQUIRE_JSON}
 {{context_block}}{{history_block}}
 {{task_prompt}}
 
-SAMPLE RESPONSE:
+PAVYZDINIS ATSAKYMAS:
 ```
 {{{json.dumps(EMPTY_SAMPLE_JSON)}}}
 ```
@@ -88,12 +77,10 @@ SAMPLE RESPONSE:
 """.strip()
 
 
-# similar to the chat flow, but with the option of including a
-# "conversation history" block
 CITATIONS_PROMPT = f"""
-Refer to the following {{context_type}} when responding to me.{DEFAULT_IGNORE_STATEMENT}
+Remkitės toliau pateiktu {{context_type}} atsakydami į mane.{DEFAULT_IGNORE_STATEMENT}
 
-CONTEXT:
+KONTEKSTAS:
 {GENERAL_SEP_PAT}
 {{context_docs_str}}
 {GENERAL_SEP_PAT}
@@ -104,12 +91,9 @@ CONTEXT:
 {{user_query}}
 """
 
-# with tool calling, the documents are in a separate "tool" message
-# NOTE: need to add the extra line about "getting right to the point" since the
-# tool calling models from OpenAI tend to be more verbose
 CITATIONS_PROMPT_FOR_TOOL_CALLING = f"""
-Refer to the provided {{context_type}} when responding to me.{DEFAULT_IGNORE_STATEMENT} \
-You should always get right to the point, and never use extraneous language.
+Remkitės pateiktu {{context_type}} atsakydami į mane.{DEFAULT_IGNORE_STATEMENT} \
+Visada eikite prie esmės ir nenaudokite perteklinės kalbos.
 
 {{history_block}}{{task_prompt}}
 
@@ -118,21 +102,17 @@ You should always get right to the point, and never use extraneous language.
 """
 
 
-# CURRENTLY DISABLED, CANNOT USE THIS ONE
-# Default chain-of-thought style json prompt which uses multiple docs
-# This one has a section for the LLM to output some non-answer "thoughts"
-# COT (chain-of-thought) flow basically
 COT_PROMPT = f"""
 {ONE_SHOT_SYSTEM_PROMPT}
 
-CONTEXT:
+KONTEKSTAS:
 {GENERAL_SEP_PAT}
 {{context_docs_str}}
 {GENERAL_SEP_PAT}
 
-You MUST respond in the following format:
+PRIVALOTE atsakyti šiuo formatu:
 ```
-{THOUGHT_PAT} Use this section as a scratchpad to reason through the answer.
+{THOUGHT_PAT} Naudokite šią dalį kaip juodraštį samprotavimui.
 
 {{{json.dumps(EMPTY_SAMPLE_JSON)}}}
 ```
@@ -143,6 +123,5 @@ You MUST respond in the following format:
 """.strip()
 
 
-# User the following for easy viewing of prompts
 if __name__ == "__main__":
-    print(JSON_PROMPT)  # Default prompt used in the Onyx UI flow
+    print(JSON_PROMPT)

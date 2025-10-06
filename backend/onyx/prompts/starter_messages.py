@@ -1,44 +1,41 @@
 PERSONA_CATEGORY_GENERATION_PROMPT = """
-Based on the assistant's name, description, and instructions, generate {num_categories}
- **unique and diverse** categories that represent different types of starter messages a user
- might send to initiate a conversation with this chatbot assistant.
+Remiantis asistento vardu, aprašu ir instrukcijomis, sugeneruokite {num_categories}
+**unikalias ir įvairias** kategorijas, atspindinčias skirtingus pradinės žinutės tipus,
+kurias vartotojas gali parašyti pokalbio pradžiai su šiuo asistentu.
 
-**Ensure that the categories are relevant and cover
-topics related to the assistant's capabilities.**
+**Įsitikinkite, kad kategorijos yra aktualios ir apima temas, susijusias su asistento galimybėmis.**
 
-Provide the categories as a JSON array of strings **without any code fences or additional text**.
+Pateikite kategorijas kaip JSON masyvą iš eilučių **be kodo blokų ir papildomo teksto**.
 
-**Context about the assistant:**
-- **Name**: {name}
-- **Description**: {description}
-- **Instructions**: {instructions}
+**Kontekstas apie asistentą:**
+- **Vardas**: {name}
+- **Aprašymas**: {description}
+- **Instrukcijos**: {instructions}
 """
 
 PERSONA_STARTER_MESSAGE_CREATION_PROMPT = """
-Create a starter message that a **user** might send to initiate a conversation with a chatbot assistant.
+Sukurkite pradinę žinutę, kurią **vartotojas** galėtų parašyti pokalbį pradedančiai su pokalbių asistentu.
 
 {category_prompt}
 
-Your response should only include the actual message that the user would send to the assistant.
-This should be natural, engaging, and encourage a helpful response from the assistant.
-**Avoid overly specific details; keep the message general and broadly applicable.**
+Jūsų atsakymas turėtų apimti tik pačią žinutę, kurią vartotojas siųstų asistentui.
+Ji turi būti natūrali, įtrauki anti ir paskatinanti naudingą asistento reakciją.
+**Venkite pernelyg specifinių detalių; žinutė turi būti bendra ir plačiai taikoma.**
 
-For example:
-- Instead of "I've just adopted a 6-month-old Labrador puppy who's pulling on the leash,"
-write "I'm having trouble training my new puppy to walk nicely on a leash."
-Do not provide any additional text or explanation and be extremely concise
+Pavyzdžiui:
+- Vietoj „Ką tik įsigijau 6 mėn. Labradoro šuniuką, kuris tempia pavadėlį,“
+rašykite „Man sunku išmokyti savo naują šuniuką gražiai eiti su pavadėliu.“
+Nepateikite jokio papildomo teksto ar paaiškinimų ir būkite labai glausti.
 
-**Context about the assistant:**
-- **Name**: {name}
-- **Description**: {description}
-- **Instructions**: {instructions}
+**Kontekstas apie asistentą:**
+- **Vardas**: {name}
+- **Aprašymas**: {description}
+- **Instrukcijos**: {instructions}
 """.strip()
 
 
-def format_persona_starter_message_prompt(
-    name: str, description: str, instructions: str, category: str | None = None
-) -> str:
-    category_prompt = f"**Category**: {category}" if category else ""
+def format_persona_starter_message_prompt(name: str, description: str, instructions: str, category: str | None = None) -> str:
+    category_prompt = f"**Kategorija**: {category}" if category else ""
     return PERSONA_STARTER_MESSAGE_CREATION_PROMPT.format(
         category_prompt=category_prompt,
         name=name,

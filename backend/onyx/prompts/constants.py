@@ -1,3 +1,4 @@
+# NOTE: Keep sentinel tokens identical to English to avoid breaking parsers.
 GENERAL_SEP_PAT = "--------------"  # Same length as Langchain's separator
 CODE_BLOCK_PAT = "```\n{}\n```"
 TRIPLE_BACKTICK = "```"
@@ -12,4 +13,5 @@ QUOTES_PAT_PLURAL = "Quotes:"
 INVALID_PAT = "Invalid:"
 SOURCES_KEY = "sources"
 
-DEFAULT_IGNORE_STATEMENT = " Ignore any context documents that are not relevant."
+# Translated, safe-to-change, user-facing helper text
+DEFAULT_IGNORE_STATEMENT = " Ignoruokite bet kokius konteksto dokumentus, kurie nėra aktualūs."

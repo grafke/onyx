@@ -1,4 +1,3 @@
-# Standards
 SEPARATOR_LINE = "-------"
 SEPARATOR_LINE_LONG = "---------------"
 NO_EXTRACTION = "No extraction of knowledge graph objects was feasable."
@@ -8,140 +7,136 @@ DC_OBJECT_SEPARATOR = ";"
 
 
 DC_OBJECT_NO_BASE_DATA_EXTRACTION_PROMPT = f"""
-You are an expert in finding relevant objects/objext specifications of the same type in a list of documents. \
-In this case you are interested \
-in generating: {{objects_of_interest}}.
-You should look at the documents - in no particular order! - and extract each object you find in the documents.
+Jūs esate ekspertas, ieškantis susijusių objektų / objektų specifikacijų to paties tipo
+keliose dokumentuose. Šiuo atveju jus domina: {{objects_of_interest}}.
+Peržiūrėkite dokumentus – bet kokia tvarka! – ir išskirkite kiekvieną objektą, kurį randate.
 {SEPARATOR_LINE}
-Here are the documents you are supposed to search through:
+Štai dokumentai, kuriuos turite peržiūrėti:
 --
 {{document_text}}
 {SEPARATOR_LINE}
-Here are the task instructions you should use to help you find the desired objects:
+Tai – užduoties instrukcijos, kurios padės surasti norimus objektus:
 {SEPARATOR_LINE}
 {{task}}
 {SEPARATOR_LINE}
-Here is the question that may provide critical additional context for the task:
+Štai klausimas, suteikiantis papildomo konteksto užduočiai:
 {SEPARATOR_LINE}
 {{question}}
 {SEPARATOR_LINE}
-Please answer the question in the following format:
-REASONING: <your reasoning for the classification> - OBJECTS: <the objects - just their names - that you found, \
-separated by ';'>
+Atsakykite šiuo formatu:
+REASONING: <jūsų pagrindimas klasifikacijai> - OBJECTS: <objektai – tik jų pavadinimai – rikiuojami „;“>
 """.strip()
 
 
 DC_OBJECT_WITH_BASE_DATA_EXTRACTION_PROMPT = f"""
-You are an expert in finding relevant objects/object specifications of the same type in a list of documents. \
-In this case you are interested \
-in generating: {{objects_of_interest}}.
-You should look at the provided data - in no particular order! - and extract each object you find in the documents.
+Jūs esate ekspertas, ieškantis susijusių objektų / objektų specifikacijų to paties tipo
+keliose dokumentuose. Šiuo atveju jus domina: {{objects_of_interest}}.
+Peržiūrėkite pateiktus duomenis – bet kokia tvarka! – ir išskirkite kiekvieną objektą, kurį randate.
 {SEPARATOR_LINE}
-Here are the data provided by the user:
+Štai pradiniai naudotojo duomenys:
 --
 {{base_data}}
 {SEPARATOR_LINE}
-Here are the task instructions you should use to help you find the desired objects:
+Tai – užduoties instrukcijos, kurios padės surasti norimus objektus:
 {SEPARATOR_LINE}
 {{task}}
 {SEPARATOR_LINE}
-Here is the request that may provide critical additional context for the task:
+Štai užklausa, suteikianti papildomo konteksto:
 {SEPARATOR_LINE}
 {{question}}
 {SEPARATOR_LINE}
-Please address the request in the following format:
-REASONING: <your reasoning for the classification> - OBJECTS: <the objects - just their names - that you found, \
-separated by ';'>
+Atsakykite šiuo formatu:
+REASONING: <jūsų pagrindimas klasifikacijai> - OBJECTS: <objektai – tik jų pavadinimai – rikiuojami „;“>
 """.strip()
 
 
 DC_OBJECT_SOURCE_RESEARCH_PROMPT = f"""
-Today is {{today}}. You are an expert in extracting relevant structured information from a list of documents that \
-should relate to one object. (Try to make sure that you know it relates to that one object!).
-You should look at the documents - in no particular order! - and extract the information asked for this task:
+Šiandien yra {{today}}. Jūs esate ekspertas, išgaunantis susistemintą informaciją
+iš kelių dokumentų apie VIENĄ objektą (įsitikinkite, kad tai tikrai tas pats objektas!).
+Peržiūrėkite dokumentus – bet kokia tvarka! – ir išskirkite užduotyje nurodytą informaciją:
 {SEPARATOR_LINE}
 {{task}}
 {SEPARATOR_LINE}
 
-Here is the user question that may provide critical additional context for the task:
+Štai naudotojo klausimas, suteikiantis papildomo konteksto:
 {SEPARATOR_LINE}
 {{question}}
 {SEPARATOR_LINE}
 
-Here are the documents you are supposed to search through:
+Štai dokumentai, kuriuos turite peržiūrėti:
 --
 {{document_text}}
 {SEPARATOR_LINE}
-Note: please cite your sources inline as you generate the results! Use the format [1], etc. Infer the \
-number from the provided context documents. This is very important!
-Please address the task in the following format:
+Pastaba: cituokite šaltinius tekste, kai pateikiate rezultatus! Naudokite formatą [1] ir t. t. Numerį
+nustatykite pagal konteksto dokumentus. Tai labai svarbu!
+Atsakykite šiuo formatu:
 REASONING:
- -- <your reasoning for the classification>
+ -- <jūsų svarstymai klasifikacijai>
 RESEARCH RESULTS:
 {{format}}
 """.strip()
 
 
 DC_OBJECT_CONSOLIDATION_PROMPT = f"""
-You are a helpful assistant that consolidates information about a specific object \
-from multiple sources.
-The object is:
+Jūs esate naudingas asistentas, konsoliduojantis informaciją apie konkretų objektą
+iš kelių šaltinių.
+Objektas:
 {SEPARATOR_LINE}
 {{object}}
 {SEPARATOR_LINE}
-and the information is
+ir informacija:
 {SEPARATOR_LINE}
 {{information}}
 {SEPARATOR_LINE}
-Here is the user question that may provide critical additional context for the task:
+Štai naudotojo klausimas, suteikiantis papildomo konteksto:
 {SEPARATOR_LINE}
 {{question}}
 {SEPARATOR_LINE}
 
-Please consolidate the information into a single, concise answer. The consolidated informtation \
-for the object should be in the following format:
+Sujunkite informaciją į vieną, glaustą atsakymą. Konsoliduota informacija apie objektą
+turi atitikti šį formatą:
 {SEPARATOR_LINE}
 {{format}}
 {SEPARATOR_LINE}
-Overall, please use this structure to communicate the consolidated information:
+Bendra struktūra:
 {SEPARATOR_LINE}
-REASONING: <your reasoning for consolidating the information>
+REASONING: <jūsų pagrindimas konsolidavimui>
 INFORMATION:
-<consolidated information in the proper format that you have created>
+<konsoliduota informacija tinkamu formatu>
 """
 
 
 DC_FORMATTING_NO_BASE_DATA_PROMPT = f"""
-You are an expert in text formatting. Your task is to take a given text and convert it 100 percent accurately \
-in a new format.
-Here is the text you are supposed to format:
+Jūs esate teksto formatavimo ekspertas. Jūsų užduotis – pateiktą tekstą 100 procentų tikslumu
+perkelti į naują formatą.
+Štai tekstas, kurį turite suformatuoti:
 {SEPARATOR_LINE}
 {{text}}
 {SEPARATOR_LINE}
-Here is the format you are supposed to use:
+Štai formatas, kurį turite naudoti:
 {SEPARATOR_LINE}
 {{format}}
 {SEPARATOR_LINE}
-Please start the generation directly with the formatted text. (Note that the output should not be code, but text.)
+Pateikite atsakymą tiesiogiai su suformatuotu tekstu. (Išvestis turi būti ne kodas, o tekstas.)
 """
 
+
 DC_FORMATTING_WITH_BASE_DATA_PROMPT = f"""
-You are an expert in text formatting. Your task is to take a given text and the initial \
-base data provided by the user, and convert it 100 percent accurately \
-in a new format. The base data may also contain important relationships that are critical \
-for the formatting.
-Here is the initial data provided by the user:
+Jūs esate teksto formatavimo ekspertas. Jūsų užduotis – pateiktą tekstą ir naudotojo pradinius duomenis
+100 procentų tikslumu perkelti į naują formatą. Pradiniai duomenys gali apimti svarbius ryšius,
+kurie būtini formatavimui.
+Štai pradiniai naudotojo duomenys:
 {SEPARATOR_LINE}
 {{base_data}}
 {SEPARATOR_LINE}
-Here is the text you are supposed combine (and format) with the initial data, adhering to the \
-format instructions provided by later in the prompt:
+Štai tekstas, kurį turite sujungti (ir suformatuoti) su pradiniais duomenimis, laikydamiesi
+formatavimo instrukcijų vėliau:
 {SEPARATOR_LINE}
 {{text}}
 {SEPARATOR_LINE}
-And here are the format instructions you are supposed to use:
+O čia – formatavimo instrukcijos:
 {SEPARATOR_LINE}
 {{format}}
 {SEPARATOR_LINE}
-Please start the generation directly with the formatted text. (Note that the output should not be code, but text.)
+Pateikite atsakymą tiesiogiai su suformatuotu tekstu. (Išvestis turi būti ne kodas, o tekstas.)
 """

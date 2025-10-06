@@ -1,34 +1,35 @@
 from pydantic import BaseModel
 
-from onyx.prompts.constants import GENERAL_SEP_PAT
-from onyx.prompts.constants import QUESTION_PAT
+from onyx.prompts.constants import GENERAL_SEP_PAT, QUESTION_PAT
 
 REQUIRE_CITATION_STATEMENT = """
-Cite relevant statements INLINE using the format [1], [2], [3], etc. to reference the document number. \
-DO NOT provide any links following the citations. In other words, avoid using the format [1](https://example.com). \
-Avoid using double brackets like [[1]]. To cite multiple documents, use [1], [2] format instead of [1, 2]. \
-Try to cite inline as opposed to leaving all citations until the very end of the response.
+Cituokite atitinkamas ištraukas EILUTĖJE, naudodami formatą [1], [2], [3] ir t. t.,
+kad nurodytumėte dokumento numerį. NESUTEIKITE jokių nuorodų po citatomis.
+Venkite dvigubų skliaustų kaip [[1]]. Norėdami cituoti kelis dokumentus,
+naudokite [1], [2] vietoje [1, 2]. Stenkitės cituoti tekste, o ne tik gale.
 """.rstrip()
 
 NO_CITATION_STATEMENT = """
-Do not provide any citations even if there are examples in the chat history.
+Neteikite jokių citatų, net jei jos yra pavyzdžiuose pokalbių istorijoje.
 """.rstrip()
 
 CITATION_REMINDER = """
-Remember to provide inline citations in the format [1], [2], [3], etc.
+Nepamirškite pateikti eilučių citatų formatu [1], [2], [3] ir t. t.
 """
+
 PROJECT_INSTRUCTIONS_SEPARATOR = (
-    "\n\n[[USER-PROVIDED INSTRUCTIONS — allowed to override default prompt guidance, "
-    "but only for style, formatting, and context]]\n"
+    "\n\n[[NAUDOTOJO PATEIKTI INSTRUKCIJOS — leidžiamos perrašyti numatytąsias prompt'o nuorodas, "
+    "bet tik stilių, formatavimo ir konteksto nuorodoms]]\n"
 )
 
-ADDITIONAL_INFO = "\n\nAdditional Information:\n\t- {datetime_info}."
+ADDITIONAL_INFO = "\n\nPapildoma informacija:\n\t- {datetime_info}."
 
-CODE_BLOCK_MARKDOWN = "Formatting re-enabled. "
+CODE_BLOCK_MARKDOWN = "Formatavimas vėl įjungtas. "
+
 
 CHAT_USER_PROMPT = f"""
-Refer to the following context documents when responding to me.{{optional_ignore_statement}}
-CONTEXT:
+Remkitės toliau pateiktais konteksto dokumentais atsakydami į mane.{{optional_ignore_statement}}
+KONTEKSTAS:
 {GENERAL_SEP_PAT}
 {{context_docs_str}}
 {GENERAL_SEP_PAT}
@@ -40,7 +41,6 @@ CONTEXT:
 """.strip()
 
 
-# History block is optional.
 CHAT_USER_CONTEXT_FREE_PROMPT = f"""
 {{history_block}}{{task_prompt}}
 
@@ -49,13 +49,6 @@ CHAT_USER_CONTEXT_FREE_PROMPT = f"""
 """.strip()
 
 
-# Design considerations for the below:
-# - In case of uncertainty, favor yes search so place the "yes" sections near the start of the
-#   prompt and after the no section as well to deemphasize the no section
-# - Conversation history can be a lot of tokens, make sure the bulk of the prompt is at the start
-#   or end so the middle history section is relatively less paid attention to than the main task
-# - Works worse with just a simple yes/no, seems asking it to produce "search" helps a bit, can
-#   consider doing COT for this and keep it brief, but likely only small gains.
 SKIP_SEARCH = "Skip Search"
 YES_SEARCH = "Yes Search"
 
@@ -66,283 +59,260 @@ class AggressiveSearchTemplateParams(BaseModel):
 
 
 def build_aggressive_search_template(params: AggressiveSearchTemplateParams) -> str:
-    """
-    Build the aggressive search template with type-safe parameters.
-
-    Args:
-        params: Pydantic model containing chat_history and final_query
-
-    Returns:
-        Formatted template string
-    """
     return f"""
-Given the conversation history and a follow up query, determine if the system should call \
-an external search tool to better answer the latest user input.
-Your default response is {YES_SEARCH}.
+Atsižvelgiant į pokalbio istoriją ir papildomą užklausą, nustatykite,
+ar sistemai reikėtų kviesti išorinę paieškos priemonę, kad geriau atsakytų į naujausią įvestį.
+Numatytasis atsakymas yra {YES_SEARCH}.
 
-Respond "{SKIP_SEARCH}" if either:
-- There is sufficient information in chat history to FULLY and ACCURATELY answer the query AND \
-additional information or details would provide little or no value.
-- The query is some form of request that does not require additional information to handle.
+Atsakykite „{SKIP_SEARCH}“, jei:
+- Pokalbio istorijoje yra pakankamai informacijos PILNAI ir TIKSLIAI atsakyti į užklausą IR
+papildoma informacija būtų menkos vertės.
+- Uždavinys nereikalauja papildomos informacijos.
 
-Conversation History:
+Pokalbio istorija:
 {GENERAL_SEP_PAT}
 {params.chat_history}
 {GENERAL_SEP_PAT}
 
-If you are at all unsure, respond with {YES_SEARCH}.
-Respond with EXACTLY and ONLY "{YES_SEARCH}" or "{SKIP_SEARCH}"
+Jei abejojate, atsakykite {YES_SEARCH}.
+Atsakykite TIKSLIAI IR TIK „{YES_SEARCH}“ arba „{SKIP_SEARCH}“
 
-Follow Up Input:
+Papildoma užklausa:
 {params.final_query}
 """.strip()
 
 
-# TODO, templatize this so users don't need to make code changes to use this
 AGGRESSIVE_SEARCH_TEMPLATE_LLAMA2 = f"""
-You are an expert of a critical system. Given the conversation history and a follow up query, \
-determine if the system should call an external search tool to better answer the latest user input.
+Jūs esate kritinės sistemos ekspertas. Atsižvelgdami į pokalbio istoriją ir papildomą užklausą,
+nustatykite, ar sistemai reikėtų kviesti išorinę paieškos priemonę, kad geriau atsakytų į naujausią įvestį.
 
-Your default response is {YES_SEARCH}.
-If you are even slightly unsure, respond with {YES_SEARCH}.
+Numatytasis atsakymas yra {YES_SEARCH}.
+Jei bent šiek tiek abejojate, atsakykite {YES_SEARCH}.
 
-Respond "{SKIP_SEARCH}" if any of these are true:
-- There is sufficient information in chat history to FULLY and ACCURATELY answer the query.
-- The query is some form of request that does not require additional information to handle.
-- You are absolutely sure about the question and there is no ambiguity in the answer or question.
+Atsakykite „{SKIP_SEARCH}“, jei bet kuri iš sąlygų teisinga:
+- Pokalbio istorijoje yra pakankamai informacijos PILNAI ir TIKSLIAI atsakyti į užklausą.
+- Uždavinys nereikalauja papildomos informacijos.
+- Visiškai aiški tema ir nėra dviprasmiškumo.
 
-Conversation History:
+Pokalbio istorija:
 {GENERAL_SEP_PAT}
 {{chat_history}}
 {GENERAL_SEP_PAT}
 
-Respond with EXACTLY and ONLY "{YES_SEARCH}" or "{SKIP_SEARCH}"
+Atsakykite TIKSLIAI IR TIK „{YES_SEARCH}“ arba „{SKIP_SEARCH}“
 
-Follow Up Input:
+Papildoma užklausa:
 {{final_query}}
 """.strip()
 
+
 REQUIRE_SEARCH_SINGLE_MSG = f"""
-Given the conversation history and a follow up query, determine if the system should call \
-an external search tool to better answer the latest user input.
+Atsižvelgiant į pokalbio istoriją ir papildomą užklausą, nustatykite,
+ar sistemai reikėtų kviesti išorinę paieškos priemonę, kad geriau atsakytų į naujausią įvestį.
 
-Respond "{YES_SEARCH}" if:
-- Specific details or additional knowledge could lead to a better answer.
-- There are new or unknown terms, or there is uncertainty what the user is referring to.
-- If reading a document cited or mentioned previously may be useful.
+Atsakykite „{YES_SEARCH}“, jei:
+- Konkretūs duomenys ar papildomos žinios gali pagerinti atsakymą.
+- Yra naujų ar neaiškių terminų, arba neaišku, į ką vartotojas remiasi.
+- Gali būti naudinga perskaityti anksčiau minėtą dokumentą.
 
-Respond "{SKIP_SEARCH}" if:
-- There is sufficient information in chat history to FULLY and ACCURATELY answer the query
-and additional information or details would provide little or no value.
-- The query is some task that does not require additional information to handle.
+Atsakykite „{SKIP_SEARCH}“, jei:
+- Pokalbio istorijoje pakanka informacijos PILNAI ir TIKSLIAI atsakyti į užklausą
+ir papildoma informacija būtų menkos vertės.
+- Uždavinys nereikalauja papildomos informacijos.
 
-Conversation History:
+Pokalbio istorija:
 {GENERAL_SEP_PAT}
 {{chat_history}}
 {GENERAL_SEP_PAT}
 
-Even if the topic has been addressed, if more specific details could be useful, \
-respond with "{YES_SEARCH}".
-If you are unsure, respond with "{YES_SEARCH}".
+Net jei tema jau paliesta, jei detalesnė informacija būtų naudinga, atsakykite „{YES_SEARCH}“.
+Jei abejojate, atsakykite „{YES_SEARCH}“.
 
-Respond with EXACTLY and ONLY "{YES_SEARCH}" or "{SKIP_SEARCH}"
+Atsakykite TIKSLIAI IR TIK „{YES_SEARCH}“ arba „{SKIP_SEARCH}“
 
-Follow Up Input:
+Papildoma užklausa:
 {{final_query}}
 """.strip()
 
 
 HISTORY_QUERY_REPHRASE = f"""
-Given the following conversation and a follow up input, rephrase the follow up into a SHORT, \
-standalone query (which captures any relevant context from previous messages) for a vectorstore.
-IMPORTANT: EDIT THE QUERY TO BE AS CONCISE AS POSSIBLE. Respond with a short, compressed phrase \
-with mainly keywords instead of a complete sentence.
-If there is a clear change in topic, disregard the previous messages.
-Strip out any information that is not relevant for the retrieval task.
-If the follow up message is an error or code snippet, repeat the same input back EXACTLY.
+Atsižvelgiant į toliau pateiktą pokalbį ir papildomą įvestį, perfrazuokite papildymą į TRUMPĄ,
+savarankišką užklausą (kuri apima reikšmingą kontekstą), skirtą vektorių paieškai.
+SVARBU: PARUOŠKITE KIEK ĮMANOMA TRUMPEAUŽKLAUSĄ – naudokite raktinius žodžius.
+Jei aiški temos kaita, ignoruokite ankstesnius pranešimus.
+Pašalinkite nereikšmingą informaciją paieškai.
+Jei įvestis yra klaida ar kodo ištrauka, grąžinkite ją NEPAKEISTĄ.
 
-Chat History:
+Pokalbio istorija:
 {GENERAL_SEP_PAT}
 {{chat_history}}
 {GENERAL_SEP_PAT}
 
-Follow Up Input: {{question}}
-Standalone question (Respond with only the short combined query):
+Papildoma įvestis: {{question}}
+Savarankiška užklausa (atsakykite tik trumpa užklausa):
 """.strip()
+
 
 INTERNET_SEARCH_QUERY_REPHRASE = f"""
-Given the following conversation and a follow up input, rephrase the follow up into a SHORT, \
-standalone query suitable for an internet search engine.
-IMPORTANT: If a specific query might limit results, keep it broad. \
-If a broad query might yield too many results, make it detailed.
-If there is a clear change in topic, ensure the query reflects the new topic accurately.
-Strip out any information that is not relevant for the internet search.
+Atsižvelgiant į toliau pateiktą pokalbį ir papildomą įvestį, perfrazuokite ją į TRUMPĄ,
+savarankišką užklausą, tinkamą interneto paieškos varikliui.
+SVARBU: jei konkreti užklausa gali riboti rezultatus, palaikykite ją platesnę;
+jei pernelyg plati duos per daug rezultatų, padarykite detalesnę.
+Jei aiški temos kaita, užklausa turi atitikti naują temą.
+Pašalinkite nereikšmingą informaciją internetinei paieškai.
 
-Chat History:
+Pokalbio istorija:
 {GENERAL_SEP_PAT}
 {{chat_history}}
 {GENERAL_SEP_PAT}
 
-Follow Up Input: {{question}}
-Internet Search Query (Respond with a detailed and specific query):
+Papildoma įvestis: {{question}}
+Interneto paieškos užklausa (atsakykite detalia ir konkrečia užklausa):
 """.strip()
 
 
-# The below prompts are retired
+# Retired prompts kept aligned with English for structure, not used in main flow
 NO_SEARCH = "No Search"
 REQUIRE_SEARCH_SYSTEM_MSG = f"""
-You are a large language model whose only job is to determine if the system should call an \
-external search tool to be able to answer the user's last message.
+Jūs esate didelis kalbos modelis, kurio vienintelis darbas – nustatyti, ar sistema turėtų kviesti
+išorinę paieškos priemonę, kad galėtų atsakyti į paskutinę vartotojo žinutę.
 
-Respond with "{NO_SEARCH}" if:
-- there is sufficient information in chat history to fully answer the user query
-- there is enough knowledge in the LLM to fully answer the user query
-- the user query does not rely on any specific knowledge
+Atsakykite „{{NO_SEARCH}}“, jei:
+- pokalbio istorijoje pakanka informacijos pilnai atsakyti į užklausą
+- modelio žinios pakankamos pilnam atsakymui
+- užklausa nereikalauja specifinių žinių
 
-Respond with "{YES_SEARCH}" if:
-- additional knowledge about entities, processes, problems, or anything else could lead to a better answer.
-- there is some uncertainty what the user is referring to
+Atsakykite „{YES_SEARCH}“, jei:
+- papildomos žinios gali pagerinti atsakymą
+- neaišku, į ką remiasi vartotojas
 
-Respond with EXACTLY and ONLY "{YES_SEARCH}" or "{NO_SEARCH}"
+Atsakykite TIKSLIAI IR TIK „{YES_SEARCH}“ arba „{{NO_SEARCH}}“
 """
 
 
 REQUIRE_SEARCH_HINT = f"""
-Hint: respond with EXACTLY {YES_SEARCH} or {NO_SEARCH}"
+Užuomina: atsakykite TIKSLIAI {YES_SEARCH} arba {{NO_SEARCH}}
 """.strip()
 
 
 QUERY_REPHRASE_SYSTEM_MSG = """
-Given a conversation (between Human and Assistant) and a final message from Human, \
-rewrite the last message to be a concise standalone query which captures required/relevant \
-context from previous messages. This question must be useful for a semantic (natural language) \
-search engine.
+Atsižvelgiant į pokalbį (tarp Žmogaus ir Asistento) ir galutinę Žmogaus žinutę,
+perrašykite paskutinę žinutę į glaustą savarankišką užklausą, kuri apimtų reikalingą
+kontekstą iš ankstesnių žinučių. Užklausa bus naudojama semantinei paieškai.
 """.strip()
 
-QUERY_REPHRASE_USER_MSG = """
-Help me rewrite this final message into a standalone query that takes into consideration the \
-past messages of the conversation IF relevant. This query is used with a semantic search engine to \
-retrieve documents. You must ONLY return the rewritten query and NOTHING ELSE. \
-IMPORTANT, the search engine does not have access to the conversation history!
 
-Query:
+QUERY_REPHRASE_USER_MSG = """
+Padėkite perrašyti šią galutinę žinutę į savarankišką užklausą, kuri, jei reikia,
+atsižvelgtų į ankstesnes pokalbio žinutes. Ši užklausa naudojama semantinei paieškai
+norint gauti dokumentus. PRIVALOTE grąžinti TIK perrašytą užklausą ir NIEKO DAUGIAU.
+SVARBU: paieškos sistema neturi prieigos prie pokalbio istorijos!
+
+Užklausa:
 {final_query}
 """.strip()
 
 
 CHAT_NAMING = f"""
-Given the following conversation, provide a SHORT name for the conversation.{{language_hint_or_empty}}
-IMPORTANT: TRY NOT TO USE MORE THAN 5 WORDS, MAKE IT AS CONCISE AS POSSIBLE.
-Focus the name on the important keywords to convey the topic of the conversation.
+Atsižvelgiant į žemiau pateiktą pokalbį, pateikite TRUMPĄ pokalbio pavadinimą.{{language_hint_or_empty}}
+SVARBU: STENKITES NEVIRŠYTI 5 ŽODŽIŲ, BŪKITE KIEK ĮMANOMA KONKRETESNI.
+Pavadinimas turi atspindėti pagrindinius raktažodžius, perteikiančius temą.
 
-Chat History:
+Pokalbio istorija:
 {GENERAL_SEP_PAT}
 {{chat_history}}
 {GENERAL_SEP_PAT}
 
-Based on the above, what is a short name to convey the topic of the conversation?
+Remiantis aukščiau pateikta informacija, koks trumpas pavadinimas geriausiai perteikia pokalbio temą?
 """.strip()
 
-# NOTE: the prompt separation is partially done for efficiency; previously I tried
-# to do it all in one prompt with sequential format() calls but this will cause a backend
-# error when the document contains any {} as python will expect the {} to be filled by
-# format() arguments
+
+# Pastabos: žemiau esančių raginimų atskyrimas padeda efektyvumui ir saugo nuo {} formatavimo kolizijų
 CONTEXTUAL_RAG_PROMPT1 = """<document>
 {document}
 </document>
-Here is the chunk we want to situate within the whole document"""
+Štai ištrauka, kurią norime įterpti į viso dokumento kontekstą"""
 
 CONTEXTUAL_RAG_PROMPT2 = """<chunk>
 {chunk}
 </chunk>
-Please give a short succinct context to situate this chunk within the overall document
-for the purposes of improving search retrieval of the chunk. Answer only with the succinct
-context and nothing else. """
+Pateikite trumpą, glaustą kontekstą, padedantį įterpti šią ištrauką į viso dokumento vaizdą
+paieškos (retrieval) tikslumui pagerinti. Atsakykite tik glaustu kontekstu ir niekuo daugiau. """
 
 CONTEXTUAL_RAG_TOKEN_ESTIMATE = 64  # 19 + 45
 
 DOCUMENT_SUMMARY_PROMPT = """<document>
 {document}
 </document>
-Please give a short succinct summary of the entire document. Answer only with the succinct
-summary and nothing else. """
+Pateikite trumpą, glaustą viso dokumento santrauką. Atsakykite tik glausta santrauka ir niekuo daugiau. """
 
 DOCUMENT_SUMMARY_TOKEN_ESTIMATE = 29
 
 
 QUERY_SEMANTIC_EXPANSION_WITHOUT_HISTORY_PROMPT = """
-Please rephrase the following user question/query as a semantic query that would be appropriate for a \
-search engine.
+Perfrazuokite toliau pateiktą naudotojo klausimą/užklausą į semantinę užklausą, tinkamą paieškos varikliui.
 
-Note:
- - do not change the meaning of the question! Specifically, if the query is an instruction, keep it \
-as an instruction!
+Pastaba:
+ - nekeiskite klausimo prasmės! Jei užklausa yra instrukcija, palikite ją instrukcija!
 
-Here is the user question/query:
+Štai naudotojo klausimas/užklausa:
 {question}
 
-Respond with EXACTLY and ONLY one rephrased question/query.
+Atsakykite TIKSLIAI IR TIK viena perfrazuota užklausa.
 
-Rephrased question/query for search engine:
+Perfrazuota užklausa paieškos varikliui:
 """.strip()
 
 
 QUERY_SEMANTIC_EXPANSION_WITH_HISTORY_PROMPT = """
-Following a previous message history, a user created a follow-up question/query.
-Please rephrase that question/query as a semantic query \
-that would be appropriate for a SEARCH ENGINE. Only use the information provided \
-from the history that is relevant to provide the relevant context for the search query, \
-meaning that the rephrased search query should be a suitable stand-alone search query.
+Turėdami ankstesnę žinučių istoriją, perfrazuokite tolesnį klausimą/užklausą į semantinę užklausą,
+kuri tiktų PAIEŠKOS VARIKLIUI. Naudokite tik tiek istorijos informacijos, kiek būtina suteikti
+reikalingą kontekstą, kad gauta užklausa būtų savarankiška.
 
-Note:
- - do not change the meaning of the question! Specifically, if the query is a an instruction, keep it \
-as an instruction!
+Pastaba:
+ - nekeiskite klausimo prasmės! Jei užklausa yra instrukcija, palikite ją instrukcija!
 
-Here is the relevant previous message history:
+Aktuali žinučių istorija:
 {history}
 
-Here is the user question:
+Naudotojo klausimas:
 {question}
 
-Respond with EXACTLY and ONLY one rephrased query.
+Atsakykite TIKSLIAI IR TIK viena perfrazuota užklausa.
 
-Rephrased query for search engine:
+Perfrazuota užklausa paieškos varikliui:
 """.strip()
 
 
 QUERY_KEYWORD_EXPANSION_WITHOUT_HISTORY_PROMPT = """
-Please rephrase the following user question as a pure keyword query that would be appropriate for a \
-search engine. IMPORTANT: the rephrased query MUST ONLY use EXISTING KEYWORDS from the original query \
-(exception: critical verbs that are converted to nouns)!
-Also, keywords are usually nouns or adjectives, so you will likely need to drop \
-any verbs. IF AND ONLY IF you really think that a verb would be critical to FINDING the document, \
-convert the verb to a noun. \
-This will be rare though. Verbs like 'find, summarize, describe, etc. would NOT fall into this category, \
-for example, and should be omitted from the rephrased keyword query.
+Perfrazuokite toliau pateiktą naudotojo klausimą į GRYNŲ RAKTINIŲ ŽODŽIŲ užklausą, tinkančią paieškos varikliui.
+SVARBU: perfrazuota užklausa PRIVALO NAUDOTI TIK EGZISTUOJANČIUS RAKTINIUS ŽODŽIUS iš pradinės užklausos
+(išimtis: kritinius veiksmažodžius galima paversti daiktavardžiais)!
+Paprastai raktiniai žodžiai – daiktavardžiai ar būdvardžiai, tad dažnai veiksmažodžius reikės atmesti.
+JEI IR TIK JEI manote, kad veiksmažodis būtinas dokumentui RASTI, paverskite jį daiktavardžiu.
+Tai turėtų būti reta. Veiksmažodžius kaip „rasti, apibendrinti, aprašyti“ pašalinkite.
 
-Here is the user question:
+Štai naudotojo klausimas:
 {question}
 
-Respond with EXACTLY and ONLY one rephrased keyword query.
+Atsakykite TIKSLIAI IR TIK viena perfrazuota raktinių žodžių užklausa.
 
-Rephrased keyword query for search engine:
+Perfrazuota raktinių žodžių užklausa paieškos varikliui:
 """.strip()
 
 
 QUERY_KEYWORD_EXPANSION_WITH_HISTORY_PROMPT = """
-Following a previous message history, a user created a follow-up question/query.
-Please rephrase that question/query as a keyword query \
-that would be appropriate for a SEARCH ENGINE. Only use the information provided \
-from the history that is relevant to provide the relevant context for the search query, \
-meaning that the rephrased search query should be a suitable stand-alone search query.
+Turėdami ankstesnę žinučių istoriją, perfrazuokite tolesnį klausimą/užklausą į RAKTINIŲ ŽODŽIŲ užklausą,
+tinkančią PAIEŠKOS VARIKLIUI. Naudokite tik tiek istorijos informacijos, kiek būtina suteikti
+reikalingą kontekstą, kad gauta užklausa būtų savarankiška.
 
-Here is the relevant previous message history:
+Aktuali žinučių istorija:
 {history}
 
-Here is the user question:
+Naudotojo klausimas:
 {question}
 
-Respond with EXACTLY and ONLY one rephrased query.
+Atsakykite TIKSLIAI IR TIK viena perfrazuota užklausa.
 
-Rephrased query for search engine:
+Perfrazuota užklausa paieškos varikliui:
 """.strip()

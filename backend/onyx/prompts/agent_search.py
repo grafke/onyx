@@ -2,16 +2,17 @@ from onyx.agents.agent_search.shared_graph_utils.constants import (
     AGENT_ANSWER_SEPARATOR,
 )
 
-# Standards
+# Standartai
 SEPARATOR_LINE = "-------"
 SEPARATOR_LINE_LONG = "---------------"
-UNKNOWN_ANSWER = "I do not have enough information to answer this question."
-NO_RECOVERED_DOCS = "No relevant information recovered"
+UNKNOWN_ANSWER = "Neturiu pakankamai informacijos, kad galėčiau atsakyti į šį klausimą."
+NO_RECOVERED_DOCS = "Nerasta jokių aktualių duomenų"
 YES = "yes"
 NO = "no"
-# Framing/Support/Template Prompts
+
+# Konteksto rėminimas / šablonai
 HISTORY_FRAMING_PROMPT = f"""
-For more context, here is the history of the conversation so far that preceded this question:
+Papildomam kontekstui – štai iki šio klausimo buvusi pokalbio istorija:
 {SEPARATOR_LINE}
 {{history}}
 {SEPARATOR_LINE}
@@ -19,46 +20,42 @@ For more context, here is the history of the conversation so far that preceded t
 
 
 COMMON_RAG_RULES = f"""
-IMPORTANT RULES:
- - If you cannot reliably answer the question solely using the provided information, say that you cannot reliably answer. \
-You may give some additional facts you learned, but do not try to invent an answer.
+SVARBIAUSIOS TAISYKLĖS:
+ - Jei negalite patikimai atsakyti remdamiesi TIK pateikta informacija, pasakykite, kad negalite patikimai atsakyti. \
+Galite pateikti papildomų faktų, kuriuos sužinojote, bet nebandykite išgalvoti atsakymo.
 
- - If the information is empty or irrelevant, just say "{UNKNOWN_ANSWER}".
+ - Jei informacija tuščia arba neaktuali, tiesiog pasakykite "{UNKNOWN_ANSWER}".
 
- - If the information is relevant but not fully conclusive, provide an answer to the extent you can but also specify that \
-the information is not conclusive and why.
+ - Jei informacija aktuali, bet nepakankamai išsami galutinei išvadai, pateikite atsakymą tiek, kiek galite, bet aiškiai nurodykite, \
+kad informacija nėra galutinė ir kodėl.
 
-- When constructing/considering categories, focus less on the question and more on the context actually provided! \
-Example: if the question is about the products of company A, and the content provided lists a number of products, \
-do automatically NOT ASSUME that those belong to company A!  So you cannot list those as products of company A, despite \
-the fact that the question is about company A's products. What you should say instead is maybe something like \
-"Here are a number of products, but I cannot say whether some or all of them belong to company A: \
-<proceed with listing the products>". It is ABSOLUTELY ESSENTIAL that the answer constructed reflects \
-actual knowledge. For that matter, also consider the title of the document and other information that may be \
-provided. If that does not make it clear that - in the example above - the products belong to company A, \
-then do not list them as products of company A, just maybe as "A list products that may not necessarily \
-belong to company A". THIS IS IMPORTANT!
+- Kategorijas konstruodami/vertindami daugiau dėmesio skirkite pateiktam kontekstui, o ne pačiam klausimui! \
+Pavyzdys: jei klausimas – apie A įmonės produktus, o kontekste pateikiamas produktų sąrašas, \
+NESPRESKITE automatiškai, kad jie priklauso A įmonei! Negalite jų nurodyti kaip A įmonės produktų, \
+net jei klausimas apie A įmonės produktus. Vietoj to sakykite, pavyzdžiui: \
+"Čia yra keli produktai, bet negaliu pasakyti, ar jie priklauso A įmonei: \
+<išvardykite produktus>". Ypač SVARBU, kad atsakymas atspindėtų faktus. Taip pat atsižvelkite į \
+dokumento pavadinimą ir kitą informaciją. Jei tai nepatvirtina, jog produktai priklauso A įmonei, \
+tada taip ir nerašykite – aiškiai pažymėkite neapibrėžtumą.
 
-- Related, if the context provides a list of items with associated data or other information that seems \
-to align with the categories in the question, but does not specify whether the items or the information is \
-specific to the exact requested category, then present the information with a disclaimer. Use a title such as \
-"I am not sure whether these items (or the information provided) is specific to [relevant category] or whether \
-these are all [specific group], but I found this information may be helpful:" \
-followed by the list of items and associated data/or information discovered.
+- Jei kontekste yra sąrašas elementų su susieta informacija, kuri atrodo atitinkanti klausime minimas kategorijas, \
+bet nėra aišku, ar tai būtent ta kategorija, pateikite su išlyga. Pavadinkite, pvz.: \
+"Nesu tikras, ar šie elementai (ar pateikta informacija) yra būtent [aktuali kategorija] arba ar tai visi [konkretūs]" \
+ir po to pateikite sąrašą.
 
- - Do not group together items amongst one headline where not all items belong to the category of the headline! \
-(Example: "Products used by Company A" where some products listed are not built by Company A, but other companies,
-or it is not clear that the products are built by Company A). Only state what you know for sure!
+ - Negrupuokite elementų po viena antrašte, jei ne visi elementai atitinka antraštės kategoriją! \
+(Pvz.: "Produktai, kuriuos naudoja A įmonė", kai dalis produktų nėra A įmonės arba tai neaišku.) \
+Nurodykite tik tai, kuo esate tikri.
 
- - Do NOT perform any calculations in the answer! Just report on facts.
+ - NEVYKDYKITE jokių skaičiavimų atsakyme! Tiesiog pateikite faktus.
 
- - If appropriate, organizing your answer in bullet points is often useful.
+ - Jei tikslinga, atsakymą dažnai patogu struktūruoti punktais.
 """.strip()
 
-ASSISTANT_SYSTEM_PROMPT_DEFAULT = "You are an assistant for question-answering tasks."
+ASSISTANT_SYSTEM_PROMPT_DEFAULT = "Jūs esate asistentas, padedantis atsakyti į klausimus."
 
 ASSISTANT_SYSTEM_PROMPT_PERSONA = f"""
-You are an assistant for question-answering tasks. Here is more information about you:
+Jūs esate asistentas, padedantis atsakyti į klausimus. Daugiau informacijos apie jus:
 {SEPARATOR_LINE}
 {{persona_prompt}}
 {SEPARATOR_LINE}
@@ -66,70 +63,70 @@ You are an assistant for question-answering tasks. Here is more information abou
 
 
 SUB_QUESTION_ANSWER_TEMPLATE = f"""
-Sub-Question: Q{{sub_question_num}}
-Question:
+Sub-klausimas: Q{{sub_question_num}}
+Klausimas:
 {{sub_question}}
 {SEPARATOR_LINE}
-Answer:
+Atsakymas:
 {{sub_answer}}
 """.strip()
 
 
 SUB_QUESTION_ANSWER_TEMPLATE_REFINED = f"""
-Sub-Question: Q{{sub_question_num}}
-Type: {{sub_question_type}}
-Sub-Question:
+Sub-klausimas: Q{{sub_question_num}}
+Tipas: {{sub_question_type}}
+Sub-klausimas:
 {SEPARATOR_LINE}
 {{sub_question}}
 {SEPARATOR_LINE}
-Answer:
+Atsakymas:
 {SEPARATOR_LINE}
 {{sub_answer}}
 {SEPARATOR_LINE}
 """.strip()
 
 
-# Step/Utility Prompts
-# Note this one should always be used with the ENTITY_TERM_EXTRACTION_PROMPT_JSON_EXAMPLE
+# Pagalbinių žingsnių raginimai
 ENTITY_TERM_EXTRACTION_PROMPT = f"""
-Based on the original question and some context retrieved from a dataset, please generate a list of \
-entities (e.g. companies, organizations, industries, products, locations, etc.), terms and concepts \
-(e.g. sales, revenue, etc.) that are relevant for the question, plus their relations to each other.
+Remiantis pradiniu klausimu ir iš duomenų rinkinio gautu kontekstu, sugeneruokite \
+sąrašą subjektų (pvz., įmonės, organizacijos, industrijos, produktai, vietovės ir t. t.), terminų ir konceptų \
+(pvz., pardavimai, pajamos ir pan.), kurie yra aktualūs klausimui, ir jų tarpusavio ryšius.
 
-Here is the original question:
+Štai pradinis klausimas:
 {SEPARATOR_LINE}
 {{question}}
 {SEPARATOR_LINE}
 
-And here is the context retrieved:
+Štai gautas kontekstas:
 {SEPARATOR_LINE}
 {{context}}
 {SEPARATOR_LINE}
 
-Please format your answer as a json object in the following format:
+Pateikite atsakymą JSON formatu, kaip nurodyta:
 """.lstrip()
+
 
 ENTITY_TERM_EXTRACTION_PROMPT_JSON_EXAMPLE = """
 {
     "retrieved_entities_relationships": {
         "entities": [
             {
-                "entity_name": "<assign a name for the entity>",
-                "entity_type": "<specify a short type name for the entity, such as 'company', 'location',...>"
+                "entity_name": "<suteikite subjekto pavadinimą>",
+                "entity_type": "<suteikite trumpo tipo pavadinimą, pvz., 'company', 'location', ...>"
             }
         ],
         "relationships": [
             {
-                "relationship_name": "<assign a name for the relationship>",
-                "relationship_type": "<specify a short type name for the relationship, such as 'sales_to', 'is_location_of',...>",
-                "relationship_entities": ["<related entity name 1>", "<related entity name 2>", "..."]
+                "relationship_name": "<suteikite ryšio pavadinimą>",
+                "relationship_type": "<trumpas ryšio tipas, pvz., 'sales_to', 'is_location_of', ...>",
+                "relationship_entities": ["<susijęs subjektas 1>", "<susijęs subjektas 2>", "..."]
             }
         ],
         "terms": [
             {
-                "term_name": "<assign a name for the term>",
-                "term_type": "<specify a short type name for the term, such as 'revenue', 'market_share',...>",
-                "term_similar_to": ["<list terms that are similar to this term>"]
+                "term_name": "<suteikite termino pavadinimą>",
+                "term_type": "<trumpas tipo pavadinimas, pvz., 'revenue', 'market_share', ...>",
+                "term_similar_to": ["<panašūs terminai>"]
             }
         ]
     }
@@ -140,934 +137,645 @@ ENTITY_TERM_EXTRACTION_PROMPT_JSON_EXAMPLE = """
 HISTORY_CONTEXT_SUMMARY_PROMPT = f"""
 {{persona_specification}}
 
-Your task now is to summarize the key parts of the history of a conversation between a user and an agent. \
-The summary has two purposes:
-  1) providing the suitable context for a new question, and
-  2) To capture the key information that was discussed and that the user may have a follow-up question about.
+Jūsų užduotis – apibendrinti svarbiausias pokalbio tarp naudotojo ir agento istorijos dalis. \
+Santrauka turi atlikti dvi funkcijas:
+  1) pateikti tinkamą kontekstą naujam klausimui,
+  2) užfiksuoti svarbią informaciją, dėl kurios naudotojas gali turėti papildomų klausimų.
 
-Here is the question:
+Štai klausimas:
 {SEPARATOR_LINE}
 {{question}}
 {SEPARATOR_LINE}
 
-And here is the history:
+Štai istorija:
 {SEPARATOR_LINE}
 {{history}}
 {SEPARATOR_LINE}
 
-Please provide a summarized context from the history so that the question makes sense and can \
-- with suitable extra information - be answered.
+Pateikite glaustą kontekstą iš istorijos, kad klausimas būtų aiškus ir, prireikus su papildoma \
+informacija, galėtų būti atsakytas.
 
-Do not use more than three or four sentences.
+Nenaudokite daugiau nei trijų–keturių sakinių.
 
-History summary:
+Istorijos santrauka:
 """.strip()
 
 
-# INITIAL PHASE
-# Sub-question
-# Intentionally left a copy in case we want to modify this one differently
+# PRADINĖ FAZĖ – Sub-klausimai
 INITIAL_QUESTION_DECOMPOSITION_PROMPT = f"""
-Please create a list of no more than 3 sub-questions whose answers would help to inform the answer \
-to the initial question.
+Sukurkite ne daugiau kaip 3 sub-klausimų sąrašą, kurių atsakymai padėtų atsakyti į pradinį klausimą.
 
-The purpose for these sub-questions could be:
-  1) decomposition to isolate individual entities (i.e., 'compare sales of company A and company B' -> \
-['what are sales for company A', 'what are sales for company B'])
+Šių sub-klausimų paskirtis gali būti:
+  1) suskaidyti klausimą, išskiriant atskirus subjektus (pvz., „palyginkite A ir B įmonių pardavimus“ -> \
+[„kokie A įmonės pardavimai“, „kokie B įmonės pardavimai“])
 
-  2) clarification and/or disambiguation of ambiguous terms (i.e., 'what is our success with company A' -> \
-['what are our sales with company A','what is our market share with company A', \
-'is company A a reference customer for us', etc.])
+  2) paaiškinti ir/arba panaikinti dviprasmybes (pvz., „koks mūsų pasisekimas su A įmone“ -> \
+[„kokie mūsų pardavimai su A įmone“, „koks mūsų rinkos dalis su A įmone“, \
+„ar A įmonė yra mūsų referencinis klientas“, ir t. t.])
 
-  3) if a term or a metric is essentially clear, but it could relate to various aspects of an entity and you \
-are generally familiar with the entity, then you can create sub-questions that are more \
-specific (i.e.,  'what do we do to improve product X' -> 'what do we do to improve scalability of product X', \
-'what do we do to improve performance of product X', 'what do we do to improve stability of product X', ...)
+  3) jei terminas ar metrika iš esmės aiškūs, bet gali sietis su įvairiais subjekto aspektais, \
+ir esate su jais susipažinę, galite sukurti specifiškesnius sub-klausimus (pvz., \
+„ką darome, kad pagerintume X produkto našumą“, „stabilumą“, „mastelį“ ir pan.)
 
-  4) research individual questions and areas that should really help to ultimately answer the question.
+  4) ištirti atskirus klausimus/sritis, kurie padėtų parengti galutinį atsakymą.
 
-Important:
+Svarbu:
 
- - Each sub-question should lend itself to be answered by a RAG system. Correspondingly, phrase the question \
-in a way that is amenable to that. An example set of sub-questions based on an initial question could look like this:
-'what can I do to improve the performance of workflow X' -> \
-'what are the settings affecting performance for workflow X', 'are there complaints and bugs related to \
-workflow X performance', 'what are performance benchmarks for workflow X', ...
+ - Kiekvienas sub-klausimas turi būti atsakomas RAG sistema. Atitinkamai formuluokite klausimą.
+ - Ne tik skaidykite – užtikrinkite tinkamą formą (be „aš“ ir pan.).
+ - NEdarykite sub-klausimų, kurie būtų aiškinamieji pačiam naudotojui. Priimkite pateiktą informaciją kaip duotą.
 
- - Consequently, again, don't just decompose, but make sure that the sub-questions have the proper form. I.e., no \
- 'I', etc.
-
- - Do not(!) create sub-questions that are clarifying question to the person who asked the question, \
-like making suggestions or asking the user for more information! This is not useful for the actual \
-question-answering process! You need to take the information from the user as it is given to you! \
-For example, should the question be of the type 'why does product X perform poorly for customer A', DO NOT create a \
-sub-question of the type 'what are the settings that customer A uses for product X?'! A valid sub-question \
-could rather be 'which settings for product X have been shown to lead to poor performance for customers?'
-
-
-And here is the initial question to create sub-questions for, so that you have the full context:
+Štai pradinis klausimas, kuriam kuriami sub-klausimai:
 {SEPARATOR_LINE}
 {{question}}
 {SEPARATOR_LINE}
 
 {{history}}
 
-Do NOT include any text in your answer outside of the list of sub-questions!
-Please formulate your answer as a newline-separated list of questions like so (and please ONLY ANSWER WITH THIS LIST! Do not \
-add any explanations or other text!):
+NEĮTRAUKITE jokio kito teksto – tik sub-klausimų sąrašą!
+Pateikite kiekvieną klausimą naujoje eilutėje (ir atsakykite TIK su sąrašu!):
 
- <sub-question>
- <sub-question>
- <sub-question>
+ <sub-klausimas>
+ <sub-klausimas>
+ <sub-klausimas>
  ...
 
-Answer:
+Atsakymas:
 """.strip()
 
-# INITIAL PHASE - AWARE OF REFINEMENT
-# Sub-question
-# Suggest augmenting question generation as well, that a future refinement phase could use
-# to generate new questions
-# Intentionally left a copy in case we want to modify this one differently
+
 INITIAL_QUESTION_DECOMPOSITION_PROMPT_ASSUMING_REFINEMENT = f"""
-Please create a list of no more than 3 sub-questions whose answers would help to inform the answer \
-to the initial question.
+Sukurkite ne daugiau kaip 3 sub-klausimų sąrašą, kurių atsakymai padėtų atsakyti į pradinį klausimą.
 
-The purpose for these sub-questions could be:
-  1) decomposition to isolate individual entities (i.e., 'compare sales of company A and company B' -> \
-['what are sales for company A', 'what are sales for company B'])
+Šių sub-klausimų paskirtis gali būti:
+  1) suskaidyti klausimą, išskiriant atskirus subjektus (pvz., „palyginkite A ir B įmonių pardavimus“ -> \
+[„kokie A įmonės pardavimai“, „kokie B įmonės pardavimai“])
+  2) paaiškinti ir/arba panaikinti dviprasmybes (pvz., „koks mūsų pasisekimas su A įmone“ -> \
+[„kokie mūsų pardavimai su A įmone“, „koks mūsų rinkos dalis su A įmone“, \
+„ar A įmonė yra mūsų referencinis klientas“, ir t. t.])
+  3) jei terminas ar metrika aiškūs, bet gali sietis su įvairiais subjekto aspektais – kurkite specifiškesnius sub-klausimus
+  4) ištirti atskiras sritis, kurios padėtų parengti galutinį atsakymą
+  5) jei prasminga, sukurkite sub-klausimų, kurie padėtų vėlesniame etape generuoti naujus sub-klausimus, remiantis ankstesnių atsakymais
 
-  2) clarification and/or disambiguation of ambiguous terms (i.e., 'what is our success with company A' -> \
-['what are our sales with company A','what is our market share with company A', \
-'is company A a reference customer for us', etc.])
+Svarbu: laikykitės RAG tinkamų formuluočių; venkite aiškinamųjų klausimų naudotojui.
 
-  3) if a term or a metric is essentially clear, but it could relate to various aspects of an entity and you \
-are generally familiar with the entity, then you can create sub-questions that are more \
-specific (i.e.,  'what do we do to improve product X' -> 'what do we do to improve scalability of product X', \
-'what do we do to improve performance of product X', 'what do we do to improve stability of product X', ...)
-
-  4) research individual questions and areas that should really help to ultimately answer the question.
-
-  5) if meaningful, find relevant facts that may inform another set of sub-questions generate after the set you \
-create now are answered. Example: 'which products have we implemented at company A, and is this different to \
-its competitors?'  could potentially create sub-questions 'what products have we implemented at company A', \
-and 'who are the competitors of company A'. The additional round of sub-question generation which sees the \
-answers for this initial round of sub-question creation could then use the answer to the second sub-question \
-(which could be 'company B and C are competitors of company A') to then ask 'which products have we implemented \
-at company B', 'which products have we implemented at company C'...
-
-Important:
-
- - Each sub-question should lend itself to be answered by a RAG system. Correspondingly, phrase the question \
-in a way that is amenable to that. An example set of sub-questions based on an initial question could look like this:
-'what can I do to improve the performance of workflow X' -> \
-'what are the settings affecting performance for workflow X', 'are there complaints and bugs related to \
-workflow X performance', 'what are performance benchmarks for workflow X', ...
-
- - Consequently, again, don't just decompose, but make sure that the sub-questions have the proper form. I.e., no \
- 'I', etc.
-
- - Do not(!) create sub-questions that are clarifying question to the person who asked the question, \
-like making suggestions or asking the user for more information! This is not useful for the actual \
-question-answering process! You need to take the information from the user as it is given to you! \
-For example, should the question be of the type 'why does product X perform poorly for customer A', DO NOT create a \
-sub-question of the type 'what are the settings that customer A uses for product X?'! A valid sub-question \
-could rather be 'which settings for product X have been shown to lead to poor performance for customers?'
-
-
-And here is the initial question to create sub-questions for:
+Štai pradinis klausimas:
 {SEPARATOR_LINE}
 {{question}}
 {SEPARATOR_LINE}
 
 {{history}}
 
-Do NOT include any text in your answer outside of the list of sub-questions!
-Please formulate your answer as a newline-separated list of questions like so (and please ONLY ANSWER WITH THIS LIST! Do not \
-add any explanations or other text!):
+NEĮTRAUKITE jokio kito teksto – tik sub-klausimų sąrašą! Pateikite po vieną eilutėje:
 
- <sub-question>
- <sub-question>
- <sub-question>
+ <sub-klausimas>
+ <sub-klausimas>
+ <sub-klausimas>
  ...
 
-Answer:
+Atsakymas:
 """.strip()
 
 
-# TODO: combine shared pieces with INITIAL_QUESTION_DECOMPOSITION_PROMPT
 INITIAL_DECOMPOSITION_PROMPT_QUESTIONS_AFTER_SEARCH = f"""
-Please create a list of no more than 3 sub-questions whose answers would help to inform the answer \
-to the initial question.
+Sukurkite ne daugiau kaip 3 sub-klausimų sąrašą, kurių atsakymai padėtų atsakyti į pradinį klausimą.
 
-The purpose for these sub-questions could be:
-  1) decomposition to isolate individual entities (i.e., 'compare sales of company A and company B' -> \
-['what are sales for company A', 'what are sales for company B'])
+Gairės – kaip aukščiau. Naudokite toliau pateiktus pavyzdinius dokumentus tik temai suvokti, \
+o ne detaliems sub-klausimams konstruoti.
 
-  2) clarification and/or disambiguation of ambiguous terms (i.e., 'what is our success with company A' -> \
-['what are our sales with company A','what is our market share with company A', \
-'is company A a reference customer for us', etc.])
-
-  3) if a term or a metric is essentially clear, but it could relate to various aspects of an entity and you \
-are generally familiar with the entity, then you can create sub-questions that are more \
-specific (i.e.,  'what do we do to improve product X' -> 'what do we do to improve scalability of product X', \
-'what do we do to improve performance of product X', 'what do we do to improve stability of product X', ...)
-
-  4) research individual questions and areas that should really help to ultimately answer the question.
-
-Important:
-
- - Each sub-question should lend itself to be answered by a RAG system. Correspondingly, phrase the question \
-in a way that is amenable to that. An example set of sub-questions based on an initial question could look like this:
-'what can I do to improve the performance of workflow X' -> \
-'what are the settings affecting performance for workflow X', 'are there complaints and bugs related to \
-workflow X performance', 'what are performance benchmarks for workflow X', ...
-
- - Consequently, again, don't just decompose, but make sure that the sub-questions have the proper form. I.e., no \
- 'I', etc.
-
- - Do not(!) create sub-questions that are clarifying question to the person who asked the question, \
-like making suggestions or asking the user for more information! This is not useful for the actual \
-question-answering process! You need to take the information from the user as it is given to you! \
-For example, should the question be of the type 'why does product X perform poorly for customer A', DO NOT create a \
-sub-question of the type 'what are the settings that customer A uses for product X?'! A valid sub-question \
-could rather be 'which settings for product X have been shown to lead to poor performance for customers?'
-
-
-To give you some context, you will see below also some documents that may relate to the question. Please only \
-use this information to learn what the question is approximately asking about, but do not focus on the details \
-to construct the sub-questions! Also, some of the entities, relationships and terms that are in the dataset may \
-not be in these few documents, so DO NOT focus too much on the documents when constructing the sub-questions! \
-Decomposition and disambiguations are most important!
-
-Here are the sample docs to give you some context:
+Pavyzdiniai dokumentai:
 {SEPARATOR_LINE}
 {{sample_doc_str}}
 {SEPARATOR_LINE}
 
-And here is the initial question to create sub-questions for, so that you have the full context:
+Pradinis klausimas:
 {SEPARATOR_LINE}
 {{question}}
 {SEPARATOR_LINE}
 
 {{history}}
 
-Do NOT include any text in your answer outside of the list of sub-questions!\
-Please formulate your answer as a newline-separated list of questions like so (and please ONLY ANSWER WITH THIS LIST! Do not \
-add any explanations or other text!):
+NEĮTRAUKITE jokio kito teksto – tik sub-klausimų sąrašą! Pateikite po vieną eilutėje:
 
- <sub-question>
- <sub-question>
- <sub-question>
+ <sub-klausimas>
+ <sub-klausimas>
+ <sub-klausimas>
  ...
 
-Answer:
+Atsakymas:
 """.strip()
+
 
 INITIAL_DECOMPOSITION_PROMPT_QUESTIONS_AFTER_SEARCH_ASSUMING_REFINEMENT = f"""
-Please create a list of no more than 3 sub-questions whose answers would help to inform the answer \
-to the initial question.
+Sukurkite ne daugiau kaip 3 sub-klausimų sąrašą, kurių atsakymai padėtų atsakyti į pradinį klausimą.
 
-The purpose for these sub-questions could be:
-  1) decomposition to isolate individual entities (i.e., 'compare sales of company A and company B' -> \
-['what are sales for company A', 'what are sales for company B'])
+Laikykitės RAG gairių; remkitės pavyzdiniais dokumentais tik konteksto suvokimui.
 
-  2) clarification and/or disambiguation of ambiguous terms (i.e., 'what is our success with company A' -> \
-['what are our sales with company A','what is our market share with company A', \
-'is company A a reference customer for us', etc.])
-
-  3) if a term or a metric is essentially clear, but it could relate to various aspects of an entity and you \
-are generally familiar with the entity, then you can create sub-questions that are more \
-specific (i.e.,  'what do we do to improve product X' -> 'what do we do to improve scalability of product X', \
-'what do we do to improve performance of product X', 'what do we do to improve stability of product X', ...)
-
-  4) research individual questions and areas that should really help to ultimately answer the question.
-
-  5) if applicable and useful, consider using sub-questions to gather relevant information that can inform a \
-subsequent set of sub-questions. The answers to your initial sub-questions will be available when generating \
-the next set.
-For example, if you start with the question, "Which products have we implemented at Company A, and how does \
-this compare to its competitors?" you might first create sub-questions like "What products have we implemented \
-at Company A?" and "Who are the competitors of Company A?"
-The answer to the second sub-question, such as "Company B and C are competitors of Company A," can then be used \
-to generate more specific sub-questions in the next round, like "Which products have we implemented at Company B?" \
-and "Which products have we implemented at Company C?"
-
-You'll be the judge!
-
-Important:
-
- - Each sub-question should lend itself to be answered by a RAG system. Correspondingly, phrase the question \
-in a way that is amenable to that. An example set of sub-questions based on an initial question could look like this:
-'what can I do to improve the performance of workflow X' -> \
-'what are the settings affecting performance for workflow X', 'are there complaints and bugs related to \
-workflow X performance', 'what are performance benchmarks for workflow X', ...
-
- - Consequently, again, don't just decompose, but make sure that the sub-questions have the proper form. I.e., no \
- 'I', etc.
-
- - Do not(!) create sub-questions that are clarifying question to the person who asked the question, \
-like making suggestions or asking the user for more information! This is not useful for the actual \
-question-answering process! You need to take the information from the user as it is given to you! \
-For example, should the question be of the type 'why does product X perform poorly for customer A', DO NOT create a \
-sub-question of the type 'what are the settings that customer A uses for product X?'! A valid sub-question \
-could rather be 'which settings for product X have been shown to lead to poor performance for customers?'
-
-To give you some context, you will see below also some documents that may relate to the question. Please only \
-use this information to learn what the question is approximately asking about, but do not focus on the details \
-to construct the sub-questions! Also, some of the entities, relationships and terms that are in the dataset may \
-not be in these few documents, so DO NOT focus too much on the documents when constructing the sub-questions! \
-Decomposition and disambiguations are most important!
-
-Here are the sample docs to give you some context:
+Pavyzdiniai dokumentai:
 {SEPARATOR_LINE}
 {{sample_doc_str}}
 {SEPARATOR_LINE}
 
-And here is the initial question to create sub-questions for, so that you have the full context:
+Pradinis klausimas:
 {SEPARATOR_LINE}
 {{question}}
 {SEPARATOR_LINE}
 
 {{history}}
 
-Do NOT include any text in your answer outside of the list of sub-questions!\
-Please formulate your answer as a newline-separated list of questions like so (and please ONLY ANSWER WITH THIS LIST! Do not \
-add any explanations or other text!):
+NEĮTRAUKITE jokio kito teksto – tik sub-klausimų sąrašą! Pateikite po vieną eilutėje:
 
- <sub-question>
- <sub-question>
- <sub-question>
+ <sub-klausimas>
+ <sub-klausimas>
+ <sub-klausimas>
  ...
 
-Answer:
+Atsakymas:
 """.strip()
 
-# Retrieval
+
+# Ieška
 QUERY_REWRITING_PROMPT = f"""
-Please convert the initial user question into a 2-3 more appropriate short and pointed search queries for \
-retrieval from a document store. Particularly, try to think about resolving ambiguities and make the search \
-queries more specific, enabling the system to search more broadly.
+Perkonstruokite pradinį klausimą į 2–3 trumpas ir tikslias paieškos užklausas \
+dokumento saugyklai. Spręskite dviprasmybes ir padarykite užklausas specifiškesnes, \
+kad sistema galėtų ieškoti plačiau.
 
-Also, try to make the search queries not redundant, i.e. not too similar!
+Taip pat stenkitės, kad užklausos nesidubliuotų.
 
-Here is the initial question:
+Pradinis klausimas:
 {SEPARATOR_LINE}
 {{question}}
 {SEPARATOR_LINE}
 
-Do NOT include any text in your answer outside of the list of queries!\
-Formulate the queries separated by newlines (Do not say 'Query 1: ...', just write the querytext) as follows:
+NEĮTRAUKITE jokio kito teksto – tik užklausų sąrašą! Pateikite po vieną eilutėje (be „Query 1:“ ir pan.):
 <query 1>
 <query 2>
 ...
 
-Queries:
+Užklausos:
 """.strip()
 
 
 DOCUMENT_VERIFICATION_PROMPT = f"""
-Determine whether the following document text contains data or information that is potentially relevant \
-for a question. It does not have to be fully relevant, but check whether it has some information that \
-would help - possibly in conjunction with other documents - to address the question.
+Nustatykite, ar toliau pateiktas dokumento tekstas turi duomenų ar informacijos, \
+potencialiai aktualios klausimui. Nebūtina, kad būtų pilnai aktualus – pakanka, jei \
+jame yra informacijos, kuri (galbūt kartu su kitais dokumentais) padėtų atsakyti.
 
-Be careful that you do not use a document where you are not sure whether the text applies to the objects \
-or entities that are relevant for the question. For example, a book about chess could have long passage \
-discussing the psychology of chess without - within the passage - mentioning chess. If now a question \
-is asked about the psychology of football, one could be tempted to use the document as it does discuss \
-psychology in sports. However, it is NOT about football and should not be deemed relevant. Please \
-consider this logic.
+Atsargiai: nenaudokite dokumento, jei nesate tikri, kad tekstas taikomas būtent klausimui aktualiems \
+objektams ar subjektams. Pvz., knyga apie šachmatus gali turėti ilgą ištrauką apie psichologiją \
+neminėdama šachmatų. Jei klausimas – apie futbolo psichologiją, toks dokumentas nėra tinkamas.
 
-DOCUMENT TEXT:
+DOKUMENTO TEKSTAS:
 {SEPARATOR_LINE}
 {{document_content}}
 {SEPARATOR_LINE}
 
-Do you think that this document text is useful and relevant to answer the following question?
+Ar šis dokumentas naudingas/aktualus atsakyti į klausimą?
 
-QUESTION:
+KLAUSIMAS:
 {SEPARATOR_LINE}
 {{question}}
 {SEPARATOR_LINE}
 
-Please answer with exactly and only a '{YES}' or '{NO}'. Do NOT include any other text in your response:
+Atsakykite tiksliai ir tik '{YES}' arba '{NO}'. NEĮTRAUKITE jokio kito teksto:
 
-Answer:
+Atsakymas:
 """.strip()
 
 
-# Sub-Question Answer Generation
+# Sub-klausimų atsakymų generavimas
 SUB_QUESTION_RAG_PROMPT = f"""
-Use the context provided below - and only the provided context - to answer the given question. \
-(Note that the answer is in service of answering a broader question, given below as 'motivation').
+Naudokite žemiau pateiktą kontekstą – ir tik jį – kad atsakytumėte į klausimą. \
+(Atsakymas padeda atsakyti į platesnį klausimą – „motyvacija“ nurodyta žemiau.)
 
-Make sure that you keep all relevant information, specifically as it concerns the ultimate goal. \
-(But keep other details as well.)
+Užtikrinkite, kad išsaugote visą aktualią informaciją, ypač susijusią su galutiniu tikslu \
+(kitą informaciją taip pat palikite).
 
 {COMMON_RAG_RULES}
 
- - Make sure that you only state what you actually can positively learn from the provided context! Particularly \
-don't make assumptions!  Example: if i) a question you should answer is asking for products of companies that \
-are competitors of company A, and ii) the context mentions products of companies A, B, C, D, E, etc., do NOT assume \
-that B, C, D, E, etc. are competitors of A! All you know is that these are products of a number of companies, and you \
-would have to rely on another question - that you do not have access to - to learn which companies are competitors of A.
-Correspondingly, you should not say that these are the products of competitors of A, but rather something like \
-"Here are some products of various companies".
+ - Nurodykite tik tai, ką tikrai galima patvirtinti iš pateikto konteksto! Neprasimanykite. \
+Pvz., jei klausimas – apie konkurentų produktus, o kontekste minimi kelių įmonių produktai, \
+NEPRIIMKITE prielaidų, kad jos konkurencinės, jei tai nepatvirtinta.
 
-It is critical that you provide inline citations in the format [D1], [D2], [D3], etc! Please use format [D1][D2] and NOT \
-[D1, D2] format if you cite two or more documents together! \
-It is important that the citation is close to the information it supports. \
-Proper citations are very important to the user!
+Labai svarbu cituoti eilutėse formatu [D1], [D2], [D3] ir t. t.! Jei cituojate kelis dokumentus \
+vienu metu, naudokite [D1][D2], o ne [D1, D2]. Citata turi būti arti ją pagrindžiančios informacijos.
 
-Here is the document context for you to consider:
+Štai dokumentų kontekstas:
 {SEPARATOR_LINE}
 {{context}}
 {SEPARATOR_LINE}
 
-For your general information, here is the ultimate motivation for the question you need to answer:
+Bendram supratimui – štai galutinis tikslas/motyvacija:
 {SEPARATOR_LINE}
 {{original_question}}
 {SEPARATOR_LINE}
 
-And here is the actual question I want you to answer based on the context above (with the motivation in mind):
+Ir štai klausimas, į kurį reikia atsakyti remiantis aukščiau pateiktu kontekstu (turint omenyje motyvaciją):
 {SEPARATOR_LINE}
 {{question}}
 {SEPARATOR_LINE}
 
-Please keep your answer brief and concise, and focus on facts and data. (Again, only state what you see in the documents \
-for sure and communicate if/in what way this may or may not relate to the question you need to answer!)
+Laikykite atsakymą trumpą ir konkretų, orientuotą į faktus ir duomenis.
 
-Answer:
+Atsakymas:
 """.strip()
 
 
 SUB_ANSWER_CHECK_PROMPT = f"""
-Determine whether the given answer addresses the given question. \
-Please do not use any internal knowledge you may have - just focus on whether the answer \
-as given seems to largely address the question as given, or at least addresses part of the question.
+Nustatykite, ar pateiktas atsakymas adresuoja pateiktą klausimą. \
+Nenaudokite vidinių žinių – vertinkite tik pagal tai, ar atsakymas iš esmės \
+adresuoja visą arba bent dalį klausimo.
 
-Here is the question:
+Štai klausimas:
 {SEPARATOR_LINE}
 {{question}}
 {SEPARATOR_LINE}
 
-Here is the suggested answer:
+Štai siūlomas atsakymas:
 {SEPARATOR_LINE}
 {{base_answer}}
 {SEPARATOR_LINE}
 
-Does the suggested answer address the question? Please answer with "{YES}" or "{NO}".
+Ar siūlomas atsakymas adresuoja klausimą? Atsakykite "{YES}" arba "{NO}".
 """.strip()
 
 
-# Initial Answer Generation
+# Pradinis atsakymas
 INITIAL_ANSWER_PROMPT_W_SUB_QUESTIONS = f"""
 {{persona_specification}}
 
-Use the information provided below - and only the provided information - to answer the provided main question.
+Naudokite žemiau pateiktą informaciją – ir tik ją – kad atsakytumėte į pagrindinį klausimą.
 
-The information provided below consists of:
-  1) a number of answered sub-questions - these are very important to help you organize your thoughts and your answer
-  2) a number of documents that are deemed relevant for the question.
+Pateikiama informacija:
+  1) keli atsakyti sub-klausimai – jie svarbūs struktūruojant mintis ir atsakymą
+  2) keli dokumentai, laikomi aktualiais klausimui
 
 {{history}}
 
-It is critical that you provide proper inline citations to documents in the format [D1], [D2], [D3], etc.! \
-It is important that the citation is close to the information it supports. If you have multiple citations that support \
-a fact, please cite for example as [D1][D3], or [D2][D4], etc. \
-Feel free to also cite sub-questions in addition to documents, but make sure that you have documents cited with the \
-sub-question citation. If you want to cite both a document and a sub-question, please use [D1][Q3], or [D2][D7][Q4], etc. \
-Again, please NEVER cite sub-questions without a document citation! Proper citations are very important for the user!
+Labai svarbu teisingai cituoti dokumentus eilutėse formatu [D1], [D2], [D3] ir t. t.! \
+Citata turi būti arti ją pagrindžiančios informacijos. Jei yra kelios citatos tam pačiam faktui, \
+naudokite, pvz., [D1][D3] arba [D2][D4]. Taip pat galite cituoti sub-klausimus, bet visada \
+PAPILDYKITE dokumento citata (pvz., [D1][Q3]). NIEKADA necituokite tik sub-klausimų be dokumento.
 
 {COMMON_RAG_RULES}
 
-Again, you should be sure that the answer is supported by the information provided!
+Vėlgi – užtikrinkite, kad atsakymas pagrįstas pateikta informacija! Pabrėžkite neapibrėžtumus ar prielaidas, jei jos esminės.
 
-Try to keep your answer concise. But also highlight uncertainties you may have should there be substantial ones, \
-or assumptions you made.
-
-Here is the contextual information:
+Kontextinė informacija:
 {SEPARATOR_LINE_LONG}
 
-*Answered Sub-questions (these should really matter!):
+*Atsakyti sub-klausimai:
 {SEPARATOR_LINE}
 {{answered_sub_questions}}
 {SEPARATOR_LINE}
 
-And here are relevant document information that support the sub-question answers, or that are relevant for the actual question:
+Aktualūs dokumentai:
 {SEPARATOR_LINE}
 {{relevant_docs}}
 {SEPARATOR_LINE}
 
-And here is the question I want you to answer based on the information above:
+Klausimas, į kurį reikia atsakyti, remiantis aukščiau pateikta informacija:
 {SEPARATOR_LINE}
 {{question}}
 {SEPARATOR_LINE}
 
-Please keep your answer brief and concise, and focus on facts and data. (Again, only state what you see in the documents for \
-sure and communicate if/in what way this may or may not relate to the question you need to answer! Use the answered \
-sub-questions as well, but be cautious and reconsider the docments again for validation.)
+Laikykite atsakymą trumpą ir konkretų, orientuotą į faktus ir duomenis.
 
-Answer:
+Atsakymas:
 """.strip()
 
 
-# Used if sub_question_answer_str is empty
 INITIAL_ANSWER_PROMPT_WO_SUB_QUESTIONS = f"""
 {{answered_sub_questions}}{{persona_specification}}
 
-Use the information provided below - and only the provided information - to answer the provided question. \
-The information provided below consists of a number of documents that were deemed relevant for the question.
+Naudokite žemiau pateiktą informaciją – ir tik ją – kad atsakytumėte į klausimą. \
+Informacija sudaryta iš keleto dokumentų, laikomų aktualiais.
 
 {{history}}
 
 {COMMON_RAG_RULES}
 
-Again, you should be sure that the answer is supported by the information provided!
+Vėlgi – užtikrinkite, kad atsakymas pagrįstas pateikta informacija!
 
-It is critical that you provide proper inline citations to documents in the format [D1], [D2], [D3], etc! \
-It is important that the citation is close to the information it supports. \
-If you have multiple citations, please cite for example as [D1][D3], or [D2][D4], etc. \
-Citations are very important for the user!
+Labai svarbu teisingai cituoti dokumentus eilutėse formatu [D1], [D2], [D3] ir t. t.! \
+Jei turite kelias citatas, naudokite, pvz., [D1][D3] arba [D2][D4]. Citatos – labai svarbios naudotojui.
 
-Here is the relevant context information:
+Aktuali kontekstinė informacija:
 {SEPARATOR_LINE}
 {{relevant_docs}}
 {SEPARATOR_LINE}
 
-And here is the question I want you to answer based on the context above:
+Klausimas, į kurį reikia atsakyti, remiantis kontekstu:
 {SEPARATOR_LINE}
 {{question}}
 {SEPARATOR_LINE}
 
-Please keep your answer brief and concise, and focus on facts and data. (Again, only state what you see in the documents \
-for sure and communicate if/in what way this may or may not relate to the question you need to answer!)
+Laikykite atsakymą trumpą ir konkretų, orientuotą į faktus ir duomenis.
 
-Answer:
+Atsakymas:
 """.strip()
 
 
-# REFINEMENT PHASE
+# TOBULINIMO FAZĖ – naujų sub-klausimų generavimas
 REFINEMENT_QUESTION_DECOMPOSITION_PROMPT = f"""
-An initial user question needs to be answered. An initial answer has been provided but it wasn't quite good enough. \
-Also, some sub-questions had been answered and this information has been used to provide the initial answer. \
-Some other subquestions may have been suggested based on little knowledge, but they were not directly answerable. \
-Also, some entities, relationships and terms are given to you so that you have an idea of how the available data looks like.
+Reikia atsakyti į pradinį klausimą. Pradinis atsakymas buvo pateiktas, bet jis nepakankamas. \
+Taip pat turite kelis atsakytus sub-klausimus, kurie buvo naudoti pradiniam atsakymui. \
+Kai kurie kiti sub-klausimai buvo siūlyti, bet neatsakyti. Taip pat pateikiami subjektai, ryšiai ir terminai – \
+kad suprastumėte, kaip atrodo turimi duomenys.
 
-Your role is to generate 2-4 new sub-questions that would help to answer the initial question, considering:
+Jūsų vaidmuo – sugeneruoti 2–4 naujus sub-klausimus, kurie padėtų atsakyti į pradinį klausimą, atsižvelgiant į:
+1) pradinį klausimą
+2) nepakankamą pradinį atsakymą
+3) atsakytus sub-klausimus
+4) siūlytus, bet neatsakytus sub-klausimus
+5) iš konteksto išgautus subjektus, ryšius ir terminus
 
-1) The initial question
-2) The initial answer that was found to be unsatisfactory
-3) The sub-questions that were answered
-4) The sub-questions that were suggested but not answered
-5) The entities, relationships and terms that were extracted from the context
+Sub-klausimai turi būti atsakomi gera RAG sistema, padėti šalinti dviprasmybes ar išskaidyti klausimą pagal subjektus, \
+nekartojant jau bandytų klausimų.
 
-The individual questions should be answerable by a good RAG system. So a good idea would be to use the sub-questions to \
-resolve ambiguities and/or to separate the question for different entities that may be involved in the original question, \
-but in a way that does not duplicate questions that were already tried.
+Papildomos gairės:
+- Sub-klausimai turi būti specifiniai ir suteikti turtingesnį kontekstą, spręsti dviprasmybes ar pradinio atsakymo trūkumus
+- Kiekvienas sub-klausimas turi būti aktualus pradiniam klausimui
+- Venkite palyginimų, dviprasmybių, vertinimų, agregacijų ir pan., jei tam reikia papildomo konteksto
+- Sub-klausimai PRIVALO būti pilnai kontekstualizuoti ir vykdomi be pradinio klausimo
+- Kiekvienam sub-klausimui pateikite paieškos terminą dokumentų paieškai
+- Saugokite nuo jau siūlytų, bet neatsakytų – tai ženklas, kad su turimu kontekstu neatsakoma
+- NEdarykite aiškinamųjų klausimų naudotojui
 
-Additional Guidelines:
-- The sub-questions should be specific to the question and provide richer context for the question, resolve ambiguities, \
-or address shortcoming of the initial answer
-- Each sub-question - when answered - should be relevant for the answer to the original question
-- The sub-questions should be free from comparisons, ambiguities,judgements, aggregations, or any other complications that \
-may require extra context
-- The sub-questions MUST have the full context of the original question so that it can be executed by a RAG system \
-independently without the original question available
-    Example:
-    - initial question: "What is the capital of France?"
-    - bad sub-question: "What is the name of the river there?"
-    - good sub-question: "What is the name of the river that flows through Paris?"
-- For each sub-question, please also provide a search term that can be used to retrieve relevant documents from a document store.
-- Consider specifically the sub-questions that were suggested but not answered. This is a sign that they are not answerable \
-with the available context, and you should not ask similar questions.
- - Do not(!) create sub-questions that are clarifying question to the person who asked the question, \
-like making suggestions or asking the user for more information! This is not useful for the actual \
-question-answering process! You need to take the information from the user as it is given to you! \
-For example, should the question be of the type 'why does product X perform poorly for customer A', DO NOT create a \
-sub-question of the type 'what are the settings that customer A uses for product X?'! A valid sub-question \
-could rather be 'which settings for product X have been shown to lead to poor performance for customers?'
-
-Here is the initial question:
+Pradinis klausimas:
 {SEPARATOR_LINE}
 {{question}}
 {SEPARATOR_LINE}
 {{history}}
 
-Here is the initial sub-optimal answer:
+Pradinis neoptimalus atsakymas:
 {SEPARATOR_LINE}
 {{base_answer}}
 {SEPARATOR_LINE}
 
-Here are the sub-questions that were answered:
+Atsakyti sub-klausimai:
 {SEPARATOR_LINE}
 {{answered_sub_questions}}
 {SEPARATOR_LINE}
 
-Here are the sub-questions that were suggested but not answered:
+Siūlyti, bet neatsakyti sub-klausimai:
 {SEPARATOR_LINE}
 {{failed_sub_questions}}
 {SEPARATOR_LINE}
 
-And here are the entities, relationships and terms extracted from the context:
+Iš konteksto išgauti subjektai, ryšiai ir terminai:
 {SEPARATOR_LINE}
 {{entity_term_extraction_str}}
 {SEPARATOR_LINE}
 
-Please generate the list of good, fully contextualized sub-questions that would help to address the main question. \
-Specifically pay attention also to the entities, relationships and terms extracted, as these indicate what type of \
-objects/relationships/terms you can ask about! Do not ask about entities, terms or relationships that are not mentioned in the \
-'entities, relationships and terms' section.
+Pateikite gerų, pilnai kontekstualizuotų sub-klausimų sąrašą. Venkite dubliavimo su jau bandytais.
+Sugeneruokite sąrašą po vieną eilutėje (ir atsakykite TIK su šiuo sąrašu!):
 
-Again, please find questions that are NOT overlapping too much with the already answered sub-questions or those that \
-already were suggested and failed. In other words - what can we try in addition to what has been tried so far?
-
-Generate the list of questions separated by one new line like this (and please ONLY ANSWER WITH THIS LIST! Do not \
-add any explanations or other text!):
-
-<sub-question 1>
-<sub-question 2>
-<sub-question 3>
+<sub-klausimas 1>
+<sub-klausimas 2>
+<sub-klausimas 3>
 ...""".strip()
 
+
 REFINEMENT_QUESTION_DECOMPOSITION_PROMPT_W_INITIAL_SUBQUESTION_ANSWERS = f"""
-An initial user question needs to be answered. An initial answer has been provided but it wasn't quite good enough. \
-Also, some sub-questions had been answered and this information has been used to provide the initial answer. \
-Some other subquestions may have been suggested based on little knowledge, but they were not directly answerable. \
-Also, some entities, relationships and terms are given to you so that you have an idea of how the available data looks like.
+Reikia atsakyti į pradinį klausimą. Pradinis atsakymas buvo pateiktas, bet jis nepakankamas. \
+Taip pat turite atsakytus sub-klausimus (ir jų atsakymus), kurie naudoti pradiniam atsakymui. \
+Kai kurie kiti sub-klausimai buvo siūlyti, bet neatsakyti. Taip pat pateikiami subjektai, ryšiai ir terminai.
 
-Your role is to generate 2-4 new sub-questions that would help to answer the initial question, considering:
+Jūsų vaidmuo – sugeneruoti 2–4 naujus sub-klausimus, atsižvelgiant į:
+1) pradinį klausimą
+2) nepakankamą pradinį atsakymą
+3) atsakytus sub-klausimus IR jų atsakymus
+4) siūlytus, bet neatsakytus sub-klausimus (NEKARTOKITE jų!)
+5) subjektus, ryšius ir terminus iš konteksto
 
-1) The initial question
-2) The initial answer that was found to be unsatisfactory
-3) The sub-questions that were answered AND their answers
-4) The sub-questions that were suggested but not answered (and that you should not repeat!)
-5) The entities, relationships and terms that were extracted from the context
+Sub-klausimai turi būti atsakomi gera RAG sistema; naudokite ankstesnių atsakymų informaciją konkretesniems klausimams.
 
-The individual questions should be answerable by a good RAG system. So a good idea would be to use the sub-questions to \
-resolve ambiguities and/or to separate the question for different entities that may be involved in the original question, \
-but in a way that does not duplicate questions that were already tried.
+Papildomos gairės:
+- Nauji sub-klausimai – specifiniai, suteikiantys kontekstą, sprendžiantys trūkumus
+- Kiekvienas naujas sub-klausimas – aktualus pradiniam klausimui
+- Venkite palyginimų, dviprasmybių, vertinimų, agregacijų be papildomo konteksto
+- Privalo būti pilnai kontekstualizuoti
+- Kiekvienam naujam sub-klausimui pateikite paieškos terminą
+- Naudokite ankstesnių sub-klausimų atsakymus, kad būtumėte tikslesni
+- Nebūkite perdėtai interpretuojantys; remkitės tik turimais faktais
+- NEdarykite aiškinamųjų klausimų naudotojui
 
-Additional Guidelines:
-
-- The new sub-questions should be specific to the question and provide richer context for the question, resolve ambiguities, \
-or address shortcoming of the initial answer
-
-- Each new sub-question - when answered - should be relevant for the answer to the original question
-
-- The new sub-questions should be free from comparisons, ambiguities,judgements, aggregations, or any other complications that \
-may require extra context
-
-- The new sub-questions MUST have the full context of the original question so that it can be executed by a RAG system \
-independently without the original question available
-    Example:
-    - initial question: "What is the capital of France?"
-    - bad sub-question: "What is the name of the river there?"
-    - good sub-question: "What is the name of the river that flows through Paris?"
-
-    - For each new sub-question, please also provide a search term that can be used to retrieve relevant documents \
-from a document store.
-
-- Consider specifically the sub-questions that were suggested but not answered. This is a sign that they are not answerable \
-with the available context, and you should not ask similar questions.
-
-- Pay attention to the answers of previous sub-question to make your sub-questions more specific! \
-Often the initial sub-questions were set up to give you critical information that you should use to generate new sub-questions.\
-For example, if the answer to a an earlier sub-question is \
-'Company B and C are competitors of Company A', you should not ask now a new sub-question involving the term 'competitors', \
-as you already have the information to create a more precise question - you should instead explicitly reference \
-'Company B' and 'Company C' in your new sub-questions, as these are the competitors based on the previously answered question.
-
-- Be precise(!) and don't make inferences you cannot be sure about! For example, in the previous example \
-where Company B and Company C were identified as competitors of Company A, and then you also get information on \
-companies D and E, do not make the inference that these are also competitors of Company A! Stick to the information you have!
-(Also, don't assume that companies B and C arethe only competitors of A, unless stated!)
-
-- Do not(!) create sub-questions that are clarifying question *to the person who asked the question*, \
-like making suggestions or asking the user for more information! This is not useful for the actual \
-question-answering process! You need to take the information from the user as it is given to you! \
-For example, should the question be of the type 'why does product X perform poorly for customer A', DO NOT create a \
-sub-question of the type 'what are the settings that customer A uses for product X?'! A valid sub-question \
-could rather be 'which settings for product X have been shown to lead to poor performance for customers?'
-
-Here is the initial question:
+Pradinis klausimas:
 {SEPARATOR_LINE}
 {{question}}
 {SEPARATOR_LINE}
 {{history}}
 
-Here is the initial sub-optimal answer:
+Pradinis neoptimalus atsakymas:
 {SEPARATOR_LINE}
 {{base_answer}}
 {SEPARATOR_LINE}
 
-Here are the sub-questions that were answered:
+Atsakyti sub-klausimai ir atsakymai:
 {SEPARATOR_LINE}
 {{answered_subquestions_with_answers}}
 {SEPARATOR_LINE}
 
-Here are the sub-questions that were suggested but not answered:
+Siūlyti, bet neatsakyti sub-klausimai:
 {SEPARATOR_LINE}
 {{failed_sub_questions}}
 {SEPARATOR_LINE}
 
-And here are the entities, relationships and terms extracted from the context:
+Iš konteksto išgauti subjektai, ryšiai ir terminai:
 {SEPARATOR_LINE}
 {{entity_term_extraction_str}}
 {SEPARATOR_LINE}
 
-Please generate the list of good, fully contextualized sub-questions that would help to address the main question. \
-Specifically pay attention also to the entities, relationships and terms extracted, as these indicate what type of \
-objects/relationships/terms you can ask about! Do not ask about entities, terms or relationships that are not mentioned \
-in the 'entities, relationships and terms' section.
+Pateikite gerų, pilnai kontekstualizuotų sub-klausimų sąrašą. Venkite dubliavimo su jau bandytais.
+Sugeneruokite sąrašą po vieną eilutėje (ir atsakykite TIK su šiuo sąrašu!):
 
-Again, please find questions that are NOT overlapping too much with the already answered sub-questions or those that \
-already were suggested and failed. In other words - what can we try in addition to what has been tried so far?
-
-Generate the list of questions separated by one new line like this (and please ONLY ANSWER WITH THIS LIST! Do not \
-add any explanations or other text!):
-
-<sub-question 1>
-<sub-question 2>
-<sub-question 3>
+<sub-klausimas 1>
+<sub-klausimas 2>
+<sub-klausimas 3>
 ...""".strip()
 
 
+# Refined atsakymo generavimas
 REFINED_ANSWER_PROMPT_W_SUB_QUESTIONS = f"""
 {{persona_specification}}
 
-Your task is to improve on a given answer to a question, as the initial answer was found to be lacking in some way.
+Jūsų užduotis – pagerinti pateiktą atsakymą į klausimą, nes pradinis atsakymas buvo nepakankamas.
 
-Use the information provided below - and only the provided information - to write your new and improved answer.
+Naudokite žemiau pateiktą informaciją – ir tik ją – kad parašytumėte naują, patobulintą atsakymą.
 
-The information provided below consists of:
-  1) an initial answer that was given but likely found to be lacking in some way.
-  2) a number of answered sub-questions - these are very important(!) and definitely should help you to answer the main \
-question. Note that the sub-questions have a type, 'initial' and 'refined'. The 'initial' ones were available for the \
-creation of the initial answer, but the 'refined' were not, they are new. So please use the 'refined' sub-questions in \
-particular to update/extend/correct/enrich the initial answer and to add more details/new facts!
-  3) a number of documents that were deemed relevant for the question. This is the context that you use largely for citations \
-(see below). So consider the answers to the sub-questions as guidelines to construct your new answer, but make sure you cite \
-the relevant document for a fact!
+Pateikiama informacija:
+  1) pradinis atsakymas, kuris buvo nepakankamas
+  2) atsakyti sub-klausimai – jie labai svarbūs ir turi padėti atsakyti į pagrindinį klausimą \
+     (yra „initial“ ir „refined“ tipų; naudokite „refined“ ypač atnaujinimams)
+  3) keli dokumentai, laikomi aktualiais – kontekstas daugiausia citatoms
 
-It is critical that you provide proper inline citations to documents in the format [D1], [D2], [D3], etc! \
-Please use format [D1][D2] and NOT [D1, D2] format if you cite two or more documents together! \
-It is important that the citation is close to the information it supports. \
-DO NOT just list all of the citations at the very end. \
-Feel free to also cite sub-questions in addition to documents, \
-but make sure that you have documents cited with the sub-question citation. \
-If you want to cite both a document and a sub-question, please use [D1][Q3], or [D2][D7][Q4], etc. and always place the \
-document citation before the sub-question citation. Again, please NEVER cite sub-questions without a document citation! \
-Proper citations are very important for the user!
+Labai svarbu teisingai cituoti dokumentus eilutėse formatu [D1], [D2], [D3] ir t. t.! \
+Jei cituojate kelis dokumentus kartu, naudokite [D1][D2], o ne [D1, D2]. Citata turi būti arti fakto.
+Galite cituoti ir sub-klausimus kartu su dokumentu (pvz., [D1][Q3]), bet NIEKADA – tik sub-klausimą be dokumento.
 
 {{history}}
 
 {COMMON_RAG_RULES}
 
-Again, you should be sure that the answer is supported by the information provided!
+Užtikrinkite, kad atsakymas pagrįstas pateikta informacija. Laikykite jį glaustą; paminėkite esminius neapibrėžtumus.
 
-Try to keep your answer concise. But also highlight uncertainties you may have should there be substantial ones, \
-or assumptions you made.
-
-Here is the contextual information:
+Kontekstas:
 {SEPARATOR_LINE_LONG}
 
-*Initial Answer that was found to be lacking:
+*Pradinis nepakankamas atsakymas:
 {SEPARATOR_LINE}
 {{initial_answer}}
 {SEPARATOR_LINE}
 
-*Answered Sub-questions (these should really help you to research your answer! They also contain questions/answers that \
-were not available when the original answer was constructed):
+*Atsakyti sub-klausimai (ypač naujieji „refined“):
 {{answered_sub_questions}}
 
-And here are the relevant documents that support the sub-question answers, and that are relevant for the actual question:
+Aktualūs dokumentai:
 {SEPARATOR_LINE}
 {{relevant_docs}}
 {SEPARATOR_LINE}
 
-Lastly, here is the main question I want you to answer based on the information above:
+Pagrindinis klausimas, į kurį reikia atsakyti:
 {SEPARATOR_LINE}
 {{question}}
 {SEPARATOR_LINE}
 
-Please keep your answer brief and concise, and focus on facts and data. (Again, only state what you see in the documents for \
-sure and communicate if/in what way this may or may not relate to the question you need to answer! Use the answered \
-sub-questions as well, but be cautious and reconsider the docments again for validation.)
+Laikykite atsakymą trumpą ir konkretų, orientuotą į faktus ir duomenis.
 
-Answer:
+Atsakymas:
 """.strip()
 
-# sub_question_answer_str is empty
+
 REFINED_ANSWER_PROMPT_WO_SUB_QUESTIONS = f"""
 {{answered_sub_questions}}{{persona_specification}}
 
-Use the information provided below - and only the provided information - to answer the provided question.
+Naudokite žemiau pateiktą informaciją – ir tik ją – kad atsakytumėte į klausimą.
 
-The information provided below consists of:
-  1) an initial answer that was given but found to be lacking in some way.
-  2) a number of documents that were also deemed relevant for the question.
+Pateikiama informacija:
+  1) pradinis atsakymas, kuris buvo nepakankamas
+  2) keli dokumentai, laikomi aktualiais
 
-It is critical that you provide proper inline citations to documents in the format [D1], [D2], [D3], etc! \
-Please use format [D1][D2] and NOT [D1, D2] format if you cite two or more documents together! \
-It is important that the citation is close to the information it supports. \
-DO NOT just list all of the citations at the very end of your response. Citations are very important for the user!
+Labai svarbu teisingai cituoti dokumentus eilutėse formatu [D1], [D2], [D3] ir t. t.! \
+Jei cituojate kelis dokumentus kartu, naudokite [D1][D2]. Citata turi būti arti fakto.
+NEIŠVARDINKITE visų citatų tik pačioje pabaigoje.
 
 {{history}}
 
 {COMMON_RAG_RULES}
-Again, you should be sure that the answer is supported by the information provided!
 
-Try to keep your answer concise. But also highlight uncertainties you may have should there be substantial ones, \
-or assumptions you made.
+Užtikrinkite, kad atsakymas pagrįstas pateikta informacija. Laikykite jį glaustą; paminėkite esminius neapibrėžtumus.
 
-Here is the contextual information:
+Kontekstas:
 {SEPARATOR_LINE_LONG}
 
-*Initial Answer that was found to be lacking:
+*Pradinis nepakankamas atsakymas:
 {SEPARATOR_LINE}
 {{initial_answer}}
 {SEPARATOR_LINE}
 
-And here are relevant document information that support the sub-question answers, \
-or that are relevant for the actual question:
+Aktualūs dokumentai:
 {SEPARATOR_LINE}
 {{relevant_docs}}
 {SEPARATOR_LINE}
 
-Lastly, here is the question I want you to answer based on the information above:
+Pagrindinis klausimas, į kurį reikia atsakyti:
 {SEPARATOR_LINE}
 {{question}}
 {SEPARATOR_LINE}
 
-Please keep your answer brief and concise, and focus on facts and data. (Again, only state what you see in the documents for \
-sure and communicate if/in what way this may or may not relate to the question you need to answer!)
+Laikykite atsakymą trumpą ir konkretų, orientuotą į faktus ir duomenis.
 
-Answer:
+Atsakymas:
 """.strip()
+
 
 REFINED_ANSWER_VALIDATION_PROMPT = f"""
 {{persona_specification}}
 
-Your task is to verify whether a given answer is truthful and accurate, and supported by the facts that you \
-will be provided with.
+Jūsų užduotis – patikrinti, ar pateiktas atsakymas teisingas, tikslus ir pagrįstas faktais,
+kurie bus pateikti.
 
-The information provided below consists of:
+Pateikiama informacija:
+  1) klausimas, į kurį reikėjo atsakyti
+  2) siūlomas atsakymas, kurio tikslumą turite įvertinti
+  3) (galimai) trumpa pokalbio istorijos santrauka – kontekstui (istorija NĖRA faktai)
+  4) keli atsakyti sub-klausimai – jų atsakymai laikomi faktais šiems tikslams
+  5) keli aktualūs dokumentai, kuriais remiantis tikrinsite atsakymo teiginius
 
-  1) a question that needed to be answered
+SVARBŪS PRINCIPAI:
+ - Įvertinkite, ar atsakyme esantys teiginiai yra teisingi ir tikslūs, remdamiesi sub-klausimų atsakymais ir dokumentais.
+ - Ypač ieškokite:
+    * svarbių teiginių, nepagrįstų sub-klausimų atsakymais ar dokumentais
+    * priskyrimų ir grupavimų be pagrindo (pvz., A yra B konkurentas) – be aiškių įrodymų
+ - Įvertinkite citatas – ar jos tinkamos pateiktiems teiginiams.
+ - Ar elementai grupuojami po antrašte, kai ne visi atitinka kategoriją?
+ - Ar atsakymas pilnai adresuoja klausimą ir yra specifinis?
+ - Patikrinkite skaičiavimus; jei klaidingi – atsakymas nepatikimas.
 
-  2) a proposed answer to the question, whose accuracy you should assess
-
-  3) potentially, a brief summary of the history of the conversation thus far, as it may give more context \
-to the question. Note that the statements in the history are NOT considered as facts, ONLY but serve to to \
-give context to the question.
-
-  4) a number of answered sub-questions - you can take the answers as facts for these purposes.
-
-  5) a number of relevant documents that should support the answer and that you should use as fact, \
-i.e., if a statement in the document backs up a statement in the answer, then that statement in the answer \
-should be considered as true.
-
-
-IMPORTANT RULES AND CONSIDERATIONS:
-
- - Please consider the statements made in the proposed answer and assess whether they are truthful and accurate, based \
-on the provided sub-answered and the documents. (Again, the history is NOT considered as facts!)
-
- - Look in particular for:
-    * material statements that are not supported by the sub-answered or the documents
-    * assignments and groupings that are not supported, like company A is competitor of company B, but this is not \
-explicitly supported by documents or sub-answers, guesses or interpretations unless explicitly asked for
-
- - look also at the citations in the proposed answer and assess whether they are appropriate given the statements \
-made in the proposed answer that cites the document.
-
- - Are items grouped together amongst one headline where not all items belong to the category of the headline? \
-(Example: "Products used by Company A" where some products listed are not used by Company A)
-
- - Does the proposed answer address the question in full?
-
- - Is the answer specific to the question? Example: if the question asks for the prices for products by Company A, \
-but the answer lists the prices for products by Company A and Company B, or products it cannot be sure are by \
-Company A, then this is not quite specific enough to the question and the answer should be rejected.
-
-- Similarly, if the question asks for properties of a certain class but the proposed answer lists or includes entities \
-that are not of that class without very explicitly saying so, then the answer should be considered inaccurate.
-
- - If there are any calculations in the proposed answer that are not supported by the documents, they need to be tested. \
-If any calculation is wrong, the proposed answer should be considered as not trustworthy.
-
-
-Here is the information:
+Štai informacija:
 {SEPARATOR_LINE_LONG}
 
-QUESTION:
+KLAUSIMAS:
 {SEPARATOR_LINE}
 {{question}}
 {SEPARATOR_LINE}
 
-PROPOSED ANSWER:
+SIŪLOMAS ATSAKYMAS:
 {SEPARATOR_LINE}
 {{proposed_answer}}
 {SEPARATOR_LINE}
 
-Here is the additional contextual information:
+Papildomas kontekstas:
 {SEPARATOR_LINE_LONG}
 
 {{history}}
 
-Sub-questions and their answers (to be considered as facts):
+Sub-klausimai ir jų atsakymai (laikomi faktais):
 {SEPARATOR_LINE}
 {{answered_sub_questions}}
 {SEPARATOR_LINE}
 
-And here are the relevant documents that support the sub-question answers, and that are relevant for the actual question:
+Aktualūs dokumentai:
 {SEPARATOR_LINE}
 {{relevant_docs}}
 {SEPARATOR_LINE}
 
+Pagalvokite nuosekliai. Suformatuokite atsakymą kaip eilutę šiuo formatu:
 
-Please think through this step by step. Format your response just as a string in the following format:
-
-Analysis: <think through your reasoning as outlined in the 'IMPORTANT RULES AND CONSIDERATIONS' section above, \
-but keep it short. Come to a conclusion whether the proposed answer can be trusted>
-Comments: <state your condensed comments you would give to a user reading the proposed answer, regarding the accuracy and \
-specificity.>
-{AGENT_ANSWER_SEPARATOR} <answer here only with yes or no, whether the proposed answer can be trusted. Base this on your \
-analysis, but only say 'yes' (trustworthy) or 'no' (not trustworthy)>
+Analysis: <trumpa jūsų analizė pagal aukščiau pateiktus principus>
+Comments: <trumpos pastabos naudotojui apie tikslumą ir specifiškumą>
+{AGENT_ANSWER_SEPARATOR} <atsakykite tik yes arba no, ar atsakymu galima pasitikėti. Remkitės analize; naudokite tik 'yes' arba 'no'>
 """.strip()
 
 
 INITIAL_REFINED_ANSWER_COMPARISON_PROMPT = f"""
-For the given question, please compare the initial answer and the refined answer and determine if the refined answer is \
-substantially better than the initial answer, not just a bit better. Better could mean:
- - additional information
- - more comprehensive information
- - more concise information
- - more structured information
- - more details
- - new bullet points
- - substantially more document citations ([D1], [D2], [D3], etc.)
+Duotam klausimui palyginkite pradinį atsakymą ir patobulintą atsakymą ir nustatykite, \
+ar patobulintas atsakymas yra İŠ ESMĖS geresnis (ne tik šiek tiek geresnis). Geresnis gali reikšti:
+ - daugiau informacijos
+ - išsamesnė informacija
+ - glaustesnė informacija
+ - geresnė struktūra
+ - daugiau detalių
+ - nauji punktai
+ - žymiai daugiau dokumentų citatų ([D1], [D2], [D3], ...)
 
-Put yourself in the shoes of the user and think about whether the refined answer is really substantially better and \
-delivers really new insights than the initial answer.
+Įsijauskite į naudotoją – ar patobulintas atsakymas tikrai teikia naujų įžvalgų ir yra geresnis?
 
-Here is the question:
+Klausimas:
 {SEPARATOR_LINE}
 {{question}}
 {SEPARATOR_LINE}
 
-Here is the initial answer:
+Pradinis atsakymas:
 {SEPARATOR_LINE}
 {{initial_answer}}
 {SEPARATOR_LINE}
 
-Here is the refined answer:
+Patobulintas atsakymas:
 {SEPARATOR_LINE}
 {{refined_answer}}
 {SEPARATOR_LINE}
 
-With these criteria in mind, is the refined answer substantially better than the initial answer?
-
-Please answer with a simple "{YES}" or "{NO}"
+Atsakykite paprastai: "{YES}" arba "{NO}"
 """.strip()
