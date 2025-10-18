@@ -1,51 +1,39 @@
-# The following prompts are used for verifying if the user's query can be answered by the current
-# system. Many new users do not understand the design/capabilities of the system and will ask
-# questions that are unanswerable such as aggregations or user specific questions that the system
-# cannot handle, this is used to identify those cases
-from onyx.prompts.constants import ANSWERABLE_PAT
-from onyx.prompts.constants import GENERAL_SEP_PAT
-from onyx.prompts.constants import QUESTION_PAT
-from onyx.prompts.constants import THOUGHT_PAT
-
+from onyx.prompts.constants import ANSWERABLE_PAT, GENERAL_SEP_PAT, QUESTION_PAT, THOUGHT_PAT
 
 ANSWERABLE_PROMPT = f"""
-You are a helper tool to determine if a query is answerable using retrieval augmented generation.
-The main system will try to answer the user query based on ONLY the top 5 most relevant \
-documents found from search.
-Sources contain both up to date and proprietary information for the specific team.
-For named or unknown entities, assume the search will find relevant and consistent knowledge \
-about the entity.
-The system is not tuned for writing code.
-The system is not tuned for interfacing with structured data via query languages like SQL.
-If the question might not require code or query language, then assume it can be answered without \
-code or query language.
-Determine if that system should attempt to answer.
-"ANSWERABLE" must be exactly "True" or "False"
+Jūs esate pagalbinis įrankis nustatyti, ar užklausą galima atsakyti naudojant
+retrieval augmented generation (RAG).
+Pagrindinė sistema bandys atsakyti remdamasi TIK 5 aktualiausiais dokumentais iš paieškos.
+Šaltiniai apima tiek naujausią, tiek nuosavybinę komandos informaciją.
+Jei minimi vardiniai ar nežinomi subjektai, laikykite, kad paieška ras atitinkamas ir nuoseklias žinias.
+Sistema nepritaikyta kodo rašymui.
+Sistema nepritaikyta darbui su struktūriniais duomenimis per užklausų kalbas, pvz., SQL.
+Jei klausimas gali būti atsakytas be kodo ar užklausų kalbų, tarkite, kad atsakyti galima.
+Nustatykite, ar sistema turėtų bandyti atsakyti.
+"ANSWERABLE" privalo būti tiksliai "True" arba "False".
 
 {GENERAL_SEP_PAT}
 
-{QUESTION_PAT.upper()} What is this Slack channel about?
+{QUESTION_PAT.upper()} Apie ką yra šis Slack kanalas?
 ```
-{THOUGHT_PAT.upper()} First the system must determine which Slack channel is being referred to. \
-By fetching 5 documents related to Slack channel contents, it is not possible to determine which \
-Slack channel the user is referring to.
+{THOUGHT_PAT.upper()} Pirmiausia sistema turi nustatyti, apie kurį Slack kanalą kalbama.
+Gavus 5 dokumentus, susijusius su Slack kanalo turiniu, neįmanoma nustatyti, apie kurį
+Slack kanalą kalbama.
 {ANSWERABLE_PAT.upper()} False
 ```
 
-{QUESTION_PAT.upper()} Onyx is unreachable.
+{QUESTION_PAT.upper()} Onyx nepasiekiamas.
 ```
-{THOUGHT_PAT.upper()} The system searches documents related to Onyx being unreachable. \
-Assuming the documents from search contains situations where Onyx is not reachable and \
-contains a fix, the query may be answerable.
+{THOUGHT_PAT.upper()} Sistema ieško dokumentų, susijusių su Onyx nepasiekiamumu.
+Darome prielaidą, kad paieškoje yra situacijų ir sprendimų, todėl užklausa gali būti atsakoma.
 {ANSWERABLE_PAT.upper()} True
 ```
 
-{QUESTION_PAT.upper()} How many customers do we have
+{QUESTION_PAT.upper()} Kiek turime klientų
 ```
-{THOUGHT_PAT.upper()} Assuming the retrieved documents contain up to date customer acquisition \
-information including a list of customers, the query can be answered. It is important to note \
-that if the information only exists in a SQL database, the system is unable to execute SQL and \
-won't find an answer.
+{THOUGHT_PAT.upper()} Jei gautuose dokumentuose yra naujausia informacija apie klientų skaičių,
+užklausa gali būti atsakoma. Jei informacija tik SQL duomenų bazėje, sistema SQL nevykdo ir
+atsakymo neras.
 {ANSWERABLE_PAT.upper()} True
 ```
 
@@ -53,6 +41,5 @@ won't find an answer.
 """.strip()
 
 
-# Use the following for easy viewing of prompts
 if __name__ == "__main__":
     print(ANSWERABLE_PROMPT)
