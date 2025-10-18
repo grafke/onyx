@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import Text from "@/refresh-components/Text";
+import Text from "@/refresh-components/texts/Text";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
 import { SvgProps } from "@/icons";
@@ -208,7 +208,8 @@ const iconClasses = (active?: boolean) =>
     },
   }) as const;
 
-export interface ButtonProps extends React.HTMLAttributes<HTMLButtonElement> {
+export interface ButtonProps
+  extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   // Button variants:
   defaulted?: boolean;
   action?: boolean;

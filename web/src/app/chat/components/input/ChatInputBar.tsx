@@ -14,9 +14,8 @@ import { useChatContext } from "@/refresh-components/contexts/ChatContext";
 import { DocumentIcon2, FileIcon } from "@/components/icons/icons";
 import { OnyxDocument, MinimalOnyxDocument } from "@/lib/search/interfaces";
 import { ChatState } from "@/app/chat/interfaces";
-import { useAssistantsContext } from "@/components/context/AssistantsContext";
-import { CalendarIcon, TagIcon, XIcon } from "lucide-react";
-import { SourceIcon } from "@/components/SourceIcon";
+import { useAgentsContext } from "@/refresh-components/contexts/AgentsContext";
+import { CalendarIcon, XIcon } from "lucide-react";
 import { getFormattedDateRangeString } from "@/lib/dateUtils";
 import { truncateString, cn } from "@/lib/utils";
 import { useUser } from "@/components/user/UserProvider";
@@ -35,7 +34,11 @@ import SvgStop from "@/icons/stop";
 import FilePicker from "@/app/chat/components/files/FilePicker";
 import { ActionToggle } from "@/app/chat/components/input/ActionManagement";
 import SelectButton from "@/refresh-components/buttons/SelectButton";
-import { getIconForAction } from "../../services/actionUtils";
+import SvgPlusCircle from "@/icons/plus-circle";
+import {
+  getIconForAction,
+  hasSearchToolsAvailable,
+} from "../../services/actionUtils";
 
 const MAX_INPUT_HEIGHT = 200;
 
@@ -130,9 +133,13 @@ function ChatInputBarInner({
 }: ChatInputBarProps) {
   const { user } = useUser();
 
-  const { forcedToolIds, setForcedToolIds } = useAssistantsContext();
-  const { currentMessageFiles, setCurrentMessageFiles, recentFiles } =
-    useProjectsContext();
+  const { forcedToolIds, setForcedToolIds } = useAgentsContext();
+  const {
+    currentMessageFiles,
+    setCurrentMessageFiles,
+    recentFiles,
+    allRecentFiles,
+  } = useProjectsContext();
 
   const currentIndexingFiles = useMemo(() => {
     return currentMessageFiles.filter(
@@ -302,6 +309,11 @@ function ChatInputBarInner({
     availableContextTokens,
   ]);
 
+  // Check if the assistant has search tools available (internal search or web search)
+  const showDeepResearch = useMemo(() => {
+    return hasSearchToolsAvailable(selectedAssistant.tools);
+  }, [selectedAssistant.tools]);
+
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (showPrompts && (e.key === "Tab" || e.key == "Enter")) {
       e.preventDefault();
@@ -385,7 +397,7 @@ function ChatInputBarInner({
 
       <div className="w-full h-full flex flex-col shadow-01 bg-background-neutral-00 rounded-16">
         {currentMessageFiles.length > 0 && (
-          <div className="px-4 pt-4">
+          <div className="p-spacing-inline bg-background-neutral-01 rounded-t-16">
             <div className="flex flex-wrap gap-2">
               {currentMessageFiles.map((file) => (
                 <FileCard
@@ -415,7 +427,9 @@ function ChatInputBarInner({
           aria-multiline
           placeholder={
             selectedAssistant.id === 0
-              ? `How can ${settings?.enterpriseSettings?.application_name || "Onyx"} help you today`
+              ? `How can ${
+                  settings?.enterpriseSettings?.application_name || "Onyx"
+                } help you today`
               : `How can ${selectedAssistant.name} help you today`
           }
           value={message}
@@ -498,8 +512,23 @@ function ChatInputBarInner({
                   setCurrentMessageFiles((prev) => [...prev, file]);
                 }
               }}
-              recentFiles={recentFiles}
+              onUnpickRecent={(file: ProjectFile) => {
+                setCurrentMessageFiles((prev) =>
+                  prev.filter(
+                    (existingFile) => existingFile.file_id !== file.file_id
+                  )
+                );
+              }}
+              recentFiles={allRecentFiles}
               handleUploadChange={handleUploadChange}
+              trigger={
+                <IconButton
+                  icon={SvgPlusCircle}
+                  tooltip="Attach Files"
+                  tertiary
+                />
+              }
+              selectedFileIds={currentMessageFiles.map((f) => f.id)}
             />
             {selectedAssistant.tools.length > 0 && (
               <ActionToggle
@@ -507,15 +536,17 @@ function ChatInputBarInner({
                 availableSources={memoizedAvailableSources}
               />
             )}
-            <SelectButton
-              leftIcon={SvgHourglass}
-              active={deepResearchEnabled}
-              onClick={toggleDeepResearch}
-              folded
-              action
-            >
-              Deep Research
-            </SelectButton>
+            {showDeepResearch && (
+              <SelectButton
+                leftIcon={SvgHourglass}
+                active={deepResearchEnabled}
+                onClick={toggleDeepResearch}
+                folded
+                action
+              >
+                Deep Research
+              </SelectButton>
+            )}
 
             {forcedToolIds.length > 0 &&
               forcedToolIds.map((toolId) => {
@@ -544,8 +575,14 @@ function ChatInputBarInner({
           </div>
 
           <div className="flex flex-row items-center gap-spacing-inline">
-            <LLMPopover requiresImageGeneration />
+            <div data-testid="ChatInputBar/llm-popover-trigger">
+              <LLMPopover
+                llmManager={llmManager}
+                requiresImageGeneration={false}
+              />
+            </div>
             <IconButton
+              id="onyx-chat-input-send-button"
               icon={chatState === "input" ? SvgArrowUp : SvgStop}
               disabled={chatState === "input" && !message}
               onClick={() => {

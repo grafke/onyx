@@ -60,7 +60,7 @@ import { Spinner } from "@/components/Spinner";
 import Button from "@/refresh-components/buttons/Button";
 import { deleteConnector } from "@/lib/connector";
 import ConnectorDocsLink from "@/components/admin/connectors/ConnectorDocsLink";
-import Text from "@/refresh-components/Text";
+import Text from "@/refresh-components/texts/Text";
 
 export interface AdvancedConfig {
   refreshFreq: number;
@@ -485,7 +485,9 @@ export default function AddConnector({
           if (result.isTimeout) {
             timeoutErrorHappenedRef.current = true;
             setPopup({
-              message: `Operation timed out after ${CONNECTOR_CREATION_TIMEOUT_MS / 1000} seconds. Check your configuration for errors?`,
+              message: `Operation timed out after ${
+                CONNECTOR_CREATION_TIMEOUT_MS / 1000
+              } seconds. Check your configuration for errors?`,
               type: "error",
             });
 

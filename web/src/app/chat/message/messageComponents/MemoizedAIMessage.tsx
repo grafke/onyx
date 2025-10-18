@@ -3,7 +3,7 @@ import { MinimalPersonaSnapshot } from "@/app/admin/assistants/interfaces";
 import { FeedbackType, Message, CitationMap } from "../../interfaces";
 import { OnyxDocument, MinimalOnyxDocument } from "@/lib/search/interfaces";
 import AIMessage from "./AIMessage";
-import { LlmDescriptor } from "@/lib/hooks";
+import { LlmDescriptor, LlmManager } from "@/lib/hooks";
 import { ProjectFile } from "@/app/chat/projects/projectsService";
 
 interface BaseMemoizedAIMessageProps {
@@ -16,7 +16,9 @@ interface BaseMemoizedAIMessageProps {
   nodeId: number;
   otherMessagesCanSwitchTo: number[];
   onMessageSelection: (messageId: number) => void;
+  llmManager: LlmManager | null;
   projectFiles?: ProjectFile[];
+  researchType?: string | null;
 }
 
 interface InternalMemoizedAIMessageProps extends BaseMemoizedAIMessageProps {
@@ -50,10 +52,10 @@ const _MemoizedAIMessage = React.memo(function _MemoizedAIMessage({
   nodeId,
   otherMessagesCanSwitchTo,
   onMessageSelection,
+  llmManager,
   projectFiles,
-}: InternalMemoizedAIMessageProps & {
-  projectFiles?: ProjectFile[];
-}) {
+  researchType,
+}: InternalMemoizedAIMessageProps) {
   return (
     <AIMessage
       rawPackets={rawPackets}
@@ -66,8 +68,10 @@ const _MemoizedAIMessage = React.memo(function _MemoizedAIMessage({
         setPresentingDocument,
         regenerate,
         overriddenModel,
+        researchType,
       }}
       nodeId={nodeId}
+      llmManager={llmManager}
       otherMessagesCanSwitchTo={otherMessagesCanSwitchTo}
       onMessageSelection={onMessageSelection}
     />
@@ -88,10 +92,10 @@ export const MemoizedAIMessage = ({
   parentMessage,
   otherMessagesCanSwitchTo,
   onMessageSelection,
+  llmManager,
   projectFiles,
-}: MemoizedAIMessageProps & {
-  projectFiles?: ProjectFile[];
-}) => {
+  researchType,
+}: MemoizedAIMessageProps) => {
   const regenerate = useMemo(() => {
     if (messageId === undefined) {
       return undefined;
@@ -133,7 +137,9 @@ export const MemoizedAIMessage = ({
       nodeId={nodeId}
       otherMessagesCanSwitchTo={otherMessagesCanSwitchTo}
       onMessageSelection={onMessageSelection}
+      llmManager={llmManager}
       projectFiles={projectFiles}
+      researchType={researchType}
     />
   );
 };

@@ -54,7 +54,7 @@ spec:
               "--loglevel=INFO",
               "--hostname=user-file-processing@%n",
               "-Q",
-              "user_file_processing,user_file_project_sync",
+              "user_file_processing,user_file_project_sync,user_file_delete",
             ]
           resources:
             {{- toYaml .Values.celery_worker_user_file_processing.resources | nindent 12 }}
@@ -71,8 +71,24 @@ spec:
             {{ .Values.celery_shared.startupProbe | toYaml | nindent 12}}
           readinessProbe:
             {{ .Values.celery_shared.readinessProbe | toYaml | nindent 12}}
+            exec:
+              command:
+                - /bin/bash
+                - -c
+                - >
+                    python onyx/background/celery/celery_k8s_probe.py
+                    --probe readiness
+                    --filename /tmp/onyx_k8s_userfileprocessing_readiness.txt
           livenessProbe:
             {{ .Values.celery_shared.livenessProbe | toYaml | nindent 12}}
+            exec:
+              command:
+                - /bin/bash
+                - -c
+                - >
+                    python onyx/background/celery/celery_k8s_probe.py
+                    --probe liveness
+                    --filename /tmp/onyx_k8s_userfileprocessing_liveness.txt
       {{- with .Values.celery_worker_user_file_processing.volumes }}
       volumes:
         {{- toYaml . | nindent 8 }}

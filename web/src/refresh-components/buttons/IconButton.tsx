@@ -9,7 +9,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import Text from "@/refresh-components/Text";
+import Text from "@/refresh-components/texts/Text";
 
 const buttonClasses = (active: boolean | undefined) =>
   ({
@@ -74,7 +74,7 @@ const iconClasses = (active: boolean | undefined) =>
   }) as const;
 
 export interface IconButtonProps
-  extends React.HTMLAttributes<HTMLButtonElement> {
+  extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   // Button states:
   active?: boolean;
   disabled?: boolean;
@@ -86,6 +86,7 @@ export interface IconButtonProps
   internal?: boolean;
 
   // Button properties:
+  onHover?: (isHovering: boolean) => void;
   onClick?: React.MouseEventHandler<HTMLButtonElement>;
   icon: React.FunctionComponent<SvgProps>;
   tooltip?: string;
@@ -100,6 +101,7 @@ export default function IconButton({
   tertiary,
   internal,
 
+  onHover,
   onClick,
   icon: Icon,
   className,
@@ -129,6 +131,14 @@ export default function IconButton({
         className
       )}
       onClick={disabled ? undefined : onClick}
+      onMouseEnter={(e) => {
+        props.onMouseEnter?.(e);
+        if (!disabled) onHover?.(true);
+      }}
+      onMouseLeave={(e) => {
+        props.onMouseLeave?.(e);
+        if (!disabled) onHover?.(false);
+      }}
       disabled={disabled}
       {...props}
     >

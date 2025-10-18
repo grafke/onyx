@@ -3,6 +3,7 @@ from datetime import datetime
 from typing import Any
 from typing import cast
 
+from braintrust import traced
 from langchain_core.messages import HumanMessage
 from langchain_core.messages import merge_content
 from langchain_core.runnables import RunnableConfig
@@ -22,6 +23,9 @@ from onyx.agents.agent_search.dr.models import DecisionResponse
 from onyx.agents.agent_search.dr.models import DRPromptPurpose
 from onyx.agents.agent_search.dr.models import OrchestrationClarificationInfo
 from onyx.agents.agent_search.dr.models import OrchestratorTool
+from onyx.agents.agent_search.dr.process_llm_stream import (
+    BasicSearchProcessedStreamResults,
+)
 from onyx.agents.agent_search.dr.process_llm_stream import process_llm_stream
 from onyx.agents.agent_search.dr.states import MainState
 from onyx.agents.agent_search.dr.states import OrchestrationSetup
@@ -37,6 +41,7 @@ from onyx.agents.agent_search.shared_graph_utils.utils import write_custom_event
 from onyx.agents.agent_search.utils import create_question_prompt
 from onyx.chat.chat_utils import build_citation_map_from_numbers
 from onyx.chat.chat_utils import saved_search_docs_from_llm_docs
+from onyx.chat.memories import make_memories_callback
 from onyx.chat.models import PromptConfig
 from onyx.chat.prompt_builder.citations_prompt import build_citations_system_message
 from onyx.chat.prompt_builder.citations_prompt import build_citations_user_message
@@ -70,6 +75,8 @@ from onyx.prompts.dr_prompts import DEFAULT_DR_SYSTEM_PROMPT
 from onyx.prompts.dr_prompts import REPEAT_PROMPT
 from onyx.prompts.dr_prompts import TOOL_DESCRIPTION
 from onyx.prompts.prompt_template import PromptTemplate
+from onyx.prompts.prompt_utils import handle_company_awareness
+from onyx.prompts.prompt_utils import handle_memories
 from onyx.server.query_and_chat.streaming_models import MessageStart
 from onyx.server.query_and_chat.streaming_models import OverallStop
 from onyx.server.query_and_chat.streaming_models import SectionEnd
@@ -116,7 +123,9 @@ def _get_available_tools(
     else:
         include_kg = False
 
-    tool_dict: dict[int, Tool] = {tool.id: tool for tool in get_tools(db_session)}
+    tool_dict: dict[int, Tool] = {
+        tool.id: tool for tool in get_tools(db_session, only_enabled=True)
+    }
 
     for tool in graph_config.tooling.tools:
 
@@ -484,6 +493,16 @@ def clarifier(
             + PROJECT_INSTRUCTIONS_SEPARATOR
             + graph_config.inputs.project_instructions
         )
+    user = (
+        graph_config.tooling.search_tool.user
+        if graph_config.tooling.search_tool
+        else None
+    )
+    memories_callback = make_memories_callback(user, db_session)
+    assistant_system_prompt = handle_company_awareness(assistant_system_prompt)
+    assistant_system_prompt = handle_memories(
+        assistant_system_prompt, memories_callback
+    )
 
     chat_history_string = (
         get_chat_history_string(
@@ -666,28 +685,30 @@ def clarifier(
                 system_prompt_to_use = assistant_system_prompt
                 user_prompt_to_use = decision_prompt + assistant_task_prompt
 
-            stream = graph_config.tooling.primary_llm.stream(
-                prompt=create_question_prompt(
-                    cast(str, system_prompt_to_use),
-                    cast(str, user_prompt_to_use),
-                    uploaded_image_context=uploaded_image_context,
-                ),
-                tools=([_ARTIFICIAL_ALL_ENCOMPASSING_TOOL]),
-                tool_choice=(None),
-                structured_response_format=graph_config.inputs.structured_response_format,
-            )
+            @traced(name="clarifier stream and process", type="llm")
+            def stream_and_process() -> BasicSearchProcessedStreamResults:
+                stream = graph_config.tooling.primary_llm.stream(
+                    prompt=create_question_prompt(
+                        cast(str, system_prompt_to_use),
+                        cast(str, user_prompt_to_use),
+                        uploaded_image_context=uploaded_image_context,
+                    ),
+                    tools=([_ARTIFICIAL_ALL_ENCOMPASSING_TOOL]),
+                    tool_choice=(None),
+                    structured_response_format=graph_config.inputs.structured_response_format,
+                )
+                return process_llm_stream(
+                    messages=stream,
+                    should_stream_answer=True,
+                    writer=writer,
+                    ind=0,
+                    final_search_results=context_llm_docs,
+                    displayed_search_results=context_llm_docs,
+                    generate_final_answer=True,
+                    chat_message_id=str(graph_config.persistence.chat_session_id),
+                )
 
-            full_response = process_llm_stream(
-                messages=stream,
-                should_stream_answer=True,
-                writer=writer,
-                ind=0,
-                final_search_results=context_llm_docs,
-                displayed_search_results=context_llm_docs,
-                generate_final_answer=True,
-                chat_message_id=str(graph_config.persistence.chat_session_id),
-            )
-
+            full_response = stream_and_process()
             if len(full_response.ai_message_chunk.tool_calls) == 0:
 
                 if isinstance(full_response.full_answer, str):

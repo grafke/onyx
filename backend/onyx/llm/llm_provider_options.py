@@ -1,6 +1,5 @@
 from enum import Enum
 
-import litellm  # type: ignore
 from pydantic import BaseModel
 
 from onyx.llm.chat_llm import VERTEX_CREDENTIALS_FILE_KWARG
@@ -18,6 +17,15 @@ class CustomConfigKeyType(Enum):
     # i.e., file based credentials (e.g., "/path/to/credentials/file.json")
     FILE_INPUT = "file_input"
 
+    # used for configuration values that require a selection from predefined options
+    SELECT = "select"
+
+
+class CustomConfigOption(BaseModel):
+    label: str
+    value: str
+    description: str | None = None
+
 
 class CustomConfigKey(BaseModel):
     name: str
@@ -27,6 +35,7 @@ class CustomConfigKey(BaseModel):
     is_secret: bool = False
     key_type: CustomConfigKeyType = CustomConfigKeyType.TEXT_INPUT
     default_value: str | None = None
+    options: list[CustomConfigOption] | None = None
 
 
 class WellKnownLLMProviderDescriptor(BaseModel):
@@ -87,18 +96,59 @@ OPEN_AI_VISIBLE_MODEL_NAMES = [
 ]
 
 BEDROCK_PROVIDER_NAME = "bedrock"
-# need to remove all the weird "bedrock/eu-central-1/anthropic.claude-v1" named
-# models
-BEDROCK_MODEL_NAMES = [
-    model
-    # bedrock_converse_models are just extensions of the bedrock_models, not sure why
-    # litellm has split them into two lists :(
-    for model in list(litellm.bedrock_models.union(litellm.bedrock_converse_models))
-    if "/" not in model and "embed" not in model
-][::-1]
+BEDROCK_DEFAULT_MODEL = "anthropic.claude-3-5-sonnet-20241022-v2:0"
+
+
+def _fallback_bedrock_regions() -> list[str]:
+    # Fall back to a conservative set of well-known Bedrock regions if boto3 data isn't available.
+    return [
+        "us-east-1",
+        "us-east-2",
+        "us-west-2",
+        "ap-northeast-1",
+        "ap-south-1",
+        "ap-southeast-1",
+        "ap-southeast-2",
+        "ap-east-1",
+        "ca-central-1",
+        "eu-central-1",
+        "eu-west-2",
+    ]
+
+
+def _build_bedrock_region_options() -> list[CustomConfigOption]:
+    try:
+        import boto3
+
+        session = boto3.session.Session()
+        regions = set(session.get_available_regions("bedrock"))
+        regions.update(session.get_available_regions("bedrock-runtime"))
+        if not regions:
+            raise ValueError("No Bedrock regions returned from boto3")
+        sorted_regions = sorted(regions)
+    except Exception:
+        sorted_regions = _fallback_bedrock_regions()
+
+    return [CustomConfigOption(label=region, value=region) for region in sorted_regions]
+
+
+BEDROCK_REGION_OPTIONS = _build_bedrock_region_options()
 
 OLLAMA_PROVIDER_NAME = "ollama"
 OLLAMA_API_KEY_CONFIG_KEY = "OLLAMA_API_KEY"
+
+
+def get_bedrock_model_names() -> list[str]:
+    import litellm
+
+    # bedrock_converse_models are just extensions of the bedrock_models, not sure why
+    # litellm has split them into two lists :(
+    return [
+        model
+        for model in list(litellm.bedrock_models.union(litellm.bedrock_converse_models))
+        if "/" not in model and "embed" not in model
+    ][::-1]
+
 
 IGNORABLE_ANTHROPIC_MODELS = [
     "claude-2",
@@ -106,11 +156,18 @@ IGNORABLE_ANTHROPIC_MODELS = [
     "anthropic/claude-3-5-sonnet-20241022",
 ]
 ANTHROPIC_PROVIDER_NAME = "anthropic"
-ANTHROPIC_MODEL_NAMES = [
-    model
-    for model in litellm.anthropic_models
-    if model not in IGNORABLE_ANTHROPIC_MODELS
-][::-1]
+
+
+def get_anthropic_model_names() -> list[str]:
+    import litellm
+
+    return [
+        model
+        for model in litellm.anthropic_models
+        if model not in IGNORABLE_ANTHROPIC_MODELS
+    ][::-1]
+
+
 ANTHROPIC_VISIBLE_MODEL_NAMES = [
     "claude-sonnet-4-5-20250929",
     "claude-sonnet-4-20250514",
@@ -158,13 +215,16 @@ VERTEXAI_VISIBLE_MODEL_NAMES = [
 ]
 
 
-_PROVIDER_TO_MODELS_MAP = {
-    OPENAI_PROVIDER_NAME: OPEN_AI_MODEL_NAMES,
-    BEDROCK_PROVIDER_NAME: BEDROCK_MODEL_NAMES,
-    ANTHROPIC_PROVIDER_NAME: ANTHROPIC_MODEL_NAMES,
-    VERTEXAI_PROVIDER_NAME: VERTEXAI_MODEL_NAMES,
-    OLLAMA_PROVIDER_NAME: [],
-}
+def _get_provider_to_models_map() -> dict[str, list[str]]:
+    """Lazy-load provider model mappings to avoid importing litellm at module level."""
+    return {
+        OPENAI_PROVIDER_NAME: OPEN_AI_MODEL_NAMES,
+        BEDROCK_PROVIDER_NAME: get_bedrock_model_names(),
+        ANTHROPIC_PROVIDER_NAME: get_anthropic_model_names(),
+        VERTEXAI_PROVIDER_NAME: VERTEXAI_MODEL_NAMES,
+        OLLAMA_PROVIDER_NAME: [],
+    }
+
 
 _PROVIDER_TO_VISIBLE_MODELS_MAP = {
     OPENAI_PROVIDER_NAME: OPEN_AI_VISIBLE_MODEL_NAMES,
@@ -248,6 +308,8 @@ def fetch_available_well_known_llms() -> list[WellKnownLLMProviderDescriptor]:
                 CustomConfigKey(
                     name="AWS_REGION_NAME",
                     display_name="AWS Region Name",
+                    key_type=CustomConfigKeyType.SELECT,
+                    options=BEDROCK_REGION_OPTIONS,
                 ),
                 CustomConfigKey(
                     name="AWS_ACCESS_KEY_ID",
@@ -314,7 +376,7 @@ def fetch_available_well_known_llms() -> list[WellKnownLLMProviderDescriptor]:
 
 
 def fetch_models_for_provider(provider_name: str) -> list[str]:
-    return _PROVIDER_TO_MODELS_MAP.get(provider_name, [])
+    return _get_provider_to_models_map().get(provider_name, [])
 
 
 def fetch_model_names_for_provider_as_set(provider_name: str) -> set[str] | None:

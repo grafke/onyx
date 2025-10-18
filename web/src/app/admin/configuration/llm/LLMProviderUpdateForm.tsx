@@ -1,7 +1,7 @@
 import ReactMarkdown from "react-markdown";
 import { LoadingAnimation } from "@/components/Loading";
 import { AdvancedOptionsToggle } from "@/components/AdvancedOptionsToggle";
-import Text from "@/refresh-components/Text";
+import Text from "@/refresh-components/texts/Text";
 import { Separator } from "@/components/ui/separator";
 import Button from "@/refresh-components/buttons/Button";
 import { Form, Formik } from "formik";
@@ -504,9 +504,40 @@ export function LLMProviderUpdateForm({
                       subtext={customConfigKey.description || undefined}
                     />
                   );
+                } else if (customConfigKey.key_type === "select") {
+                  const options =
+                    customConfigKey.options?.map((option) => ({
+                      name: option.label,
+                      value: option.value,
+                      description: option.description ?? undefined,
+                    })) ?? [];
+
+                  return (
+                    <div key={customConfigKey.name}>
+                      <SelectorFormField
+                        small={firstTimeConfiguration}
+                        name={`custom_config.${customConfigKey.name}`}
+                        label={customConfigKey.display_name}
+                        subtext={
+                          customConfigKey.description ? (
+                            <ReactMarkdown
+                              components={{ a: customLinkRenderer }}
+                            >
+                              {customConfigKey.description}
+                            </ReactMarkdown>
+                          ) : undefined
+                        }
+                        options={options}
+                        includeReset={!customConfigKey.is_required}
+                        defaultValue={
+                          customConfigKey.default_value || undefined
+                        }
+                      />
+                    </div>
+                  );
                 } else {
                   throw new Error(
-                    "Unreachable; there should only exist 2 options"
+                    `Unhandled custom config key type: ${customConfigKey.key_type}`
                   );
                 }
               }

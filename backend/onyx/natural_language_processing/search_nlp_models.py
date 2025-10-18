@@ -25,7 +25,6 @@ from retry import retry
 
 from onyx.configs.app_configs import INDEXING_EMBEDDING_MODEL_NUM_THREADS
 from onyx.configs.app_configs import LARGE_CHUNK_RATIO
-from onyx.configs.app_configs import SKIP_WARM_UP
 from onyx.configs.model_configs import BATCH_SIZE_ENCODE_CHUNKS
 from onyx.configs.model_configs import (
     BATCH_SIZE_ENCODE_CHUNKS_FOR_API_EMBEDDING_SERVICES,
@@ -53,6 +52,7 @@ from shared_configs.configs import INDEXING_ONLY
 from shared_configs.configs import MODEL_SERVER_HOST
 from shared_configs.configs import MODEL_SERVER_PORT
 from shared_configs.configs import OPENAI_EMBEDDING_TIMEOUT
+from shared_configs.configs import SKIP_WARM_UP
 from shared_configs.configs import VERTEXAI_EMBEDDING_LOCAL_BATCH_SIZE
 from shared_configs.enums import EmbeddingProvider
 from shared_configs.enums import EmbedTextType
@@ -290,7 +290,10 @@ class CloudEmbedding:
 
         # Dispatch all embedding calls asynchronously at once
         tasks = [
-            client.get_embeddings_async(batch, auto_truncate=True) for batch in batches
+            client.get_embeddings_async(
+                cast(list[str | TextEmbeddingInput], batch), auto_truncate=True
+            )
+            for batch in batches
         ]
 
         # Wait for all tasks to complete in parallel
@@ -1115,6 +1118,9 @@ def warm_up_cross_encoder(
     rerank_model_name: str,
     non_blocking: bool = False,
 ) -> None:
+    if SKIP_WARM_UP:
+        return
+
     logger.debug(f"Warming up reranking model: {rerank_model_name}")
 
     reranking_model = RerankingModel(

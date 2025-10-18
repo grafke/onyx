@@ -61,25 +61,27 @@ import {
 } from "react";
 import * as Yup from "yup";
 import { SettingsContext } from "@/components/settings/SettingsProvider";
-import { FullPersona, PersonaLabel, StarterMessage } from "./interfaces";
+import {
+  FullPersona,
+  PersonaLabel,
+  StarterMessage,
+} from "@/app/admin/assistants/interfaces";
 import {
   PersonaUpsertParameters,
   createPersona,
   updatePersona,
   deletePersona,
-} from "./lib";
+} from "@/app/admin/assistants/lib";
 import {
   CameraIcon,
   GroupsIconSkeleton,
-  NewChatIcon,
   SwapIcon,
   TrashIcon,
 } from "@/components/icons/icons";
 import { buildImgUrl } from "@/app/chat/components/files/images/utils";
-import { useAssistantsContext } from "@/components/context/AssistantsContext";
-import { debounce } from "lodash";
-import { LLMProviderView } from "../configuration/llm/interfaces";
-import StarterMessagesList from "./StarterMessageList";
+import { debounce, values } from "lodash";
+import { LLMProviderView } from "@/app/admin/configuration/llm/interfaces";
+import StarterMessagesList from "@/app/admin/assistants/StarterMessageList";
 
 import { SwitchField } from "@/components/ui/switch";
 import { generateIdenticon } from "@/components/assistants/AssistantIcon";
@@ -93,18 +95,8 @@ import {
 } from "@/components/Dropdown";
 import { SourceChip } from "@/app/chat/components/input/ChatInputBar";
 import { FileCard } from "@/app/chat/components/projects/ProjectContextPanel";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import FilesList from "@/app/chat/components/files/FilesList";
-import {
-  MultipleFilesIcon,
-  OpenFolderIcon,
-} from "@/components/icons/CustomIcons";
+import CoreModal from "@/refresh-components/modals/CoreModal";
+import UserFilesModalContent from "@/components/modals/UserFilesModalContent";
 import { TagIcon, UserIcon, FileIcon, InfoIcon, BookIcon } from "lucide-react";
 import { LLMSelector } from "@/components/llm/LLMSelector";
 import useSWR from "swr";
@@ -125,6 +117,12 @@ import { useProjectsContext } from "@/app/chat/projects/ProjectsContext";
 import FilePicker from "@/app/chat/components/files/FilePicker";
 import SvgTrash from "@/icons/trash";
 import SvgEditBig from "@/icons/edit-big";
+import LineItem from "@/refresh-components/buttons/LineItem";
+import SvgPlusCircle from "@/icons/plus-circle";
+import SvgFiles from "@/icons/files";
+import { useAgentsContext } from "@/refresh-components/contexts/AgentsContext";
+import Text from "@/refresh-components/texts/Text";
+import CreateButton from "@/refresh-components/buttons/CreateButton";
 
 function findSearchTool(tools: ToolSnapshot[]) {
   return tools.find((tool) => tool.in_code_tool_id === SEARCH_TOOL_ID);
@@ -170,7 +168,9 @@ export function AssistantEditor({
   tools: ToolSnapshot[];
   shouldAddAssistantToUserPreferences?: boolean;
 }) {
-  const { refreshAssistants } = useAssistantsContext();
+  // NOTE: assistants = agents
+  // TODO: rename everything to agents
+  const { refreshAgents } = useAgentsContext();
 
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -339,7 +339,7 @@ export function AssistantEditor({
     enabledToolsMap[tool.id] = personaCurrentToolIds.includes(tool.id);
   });
 
-  const { recentFiles, uploadFiles: uploadProjectFiles } = useProjectsContext();
+  const { allRecentFiles, beginUpload } = useProjectsContext();
 
   const [showVisibilityWarning, setShowVisibilityWarning] = useState(false);
 
@@ -527,7 +527,7 @@ export function AssistantEditor({
     if (existingPersona) {
       const response = await deletePersona(existingPersona.id);
       if (response.ok) {
-        await refreshAssistants();
+        await refreshAgents();
         router.push(
           isAdminPage ? `/admin/assistants?u=${Date.now()}` : `/chat`
         );
@@ -539,6 +539,8 @@ export function AssistantEditor({
       }
     }
   };
+
+  // Removed invalid helper; replacement happens inline in the upload handler using the beginUpload onSuccess callback
 
   return (
     <div className="mx-auto max-w-4xl">
@@ -598,11 +600,9 @@ export function AssistantEditor({
         validateOnBlur={false}
         validationSchema={Yup.object()
           .shape({
-            name: Yup.string().required(
-              "Must provide a name for the Assistant"
-            ),
+            name: Yup.string().required("Must provide a name for the Agent"),
             description: Yup.string().required(
-              "Must provide a description for the Assistant"
+              "Must provide a description for the Agent"
             ),
             system_prompt: Yup.string().max(
               MAX_CHARACTERS_PERSONA_DESCRIPTION,
@@ -743,7 +743,7 @@ export function AssistantEditor({
           let error = null;
 
           if (!personaResponse) {
-            error = "Failed to create Assistant - no response received";
+            error = "Failed to create Agent - no response received";
           } else if (!personaResponse.ok) {
             error = await personaResponse.text();
           }
@@ -751,7 +751,7 @@ export function AssistantEditor({
           if (error || !personaResponse) {
             setPopup({
               type: "error",
-              message: `Failed to create Assistant - ${error}`,
+              message: `Failed to create Agent - ${error}`,
             });
             formikHelpers.setSubmitting(false);
           } else {
@@ -779,7 +779,7 @@ export function AssistantEditor({
                   message: `"${assistant.name}" has been added to your list.`,
                   type: "success",
                 });
-                await refreshAssistants();
+                await refreshAgents();
               } else {
                 setPopup({
                   message: `"${assistant.name}" could not be added to your list.`,
@@ -788,7 +788,7 @@ export function AssistantEditor({
               }
             }
 
-            await refreshAssistants();
+            await refreshAgents();
 
             router.push(
               isAdminPage
@@ -820,7 +820,7 @@ export function AssistantEditor({
               return (
                 <img
                   src={uploadedImagePreview}
-                  alt="Uploaded assistant icon"
+                  alt="Uploaded agent icon"
                   className="w-12 h-12 rounded-full object-cover"
                 />
               );
@@ -830,7 +830,7 @@ export function AssistantEditor({
               return (
                 <img
                   src={buildImgUrl(existingPersona?.uploaded_image_id)}
-                  alt="Uploaded assistant icon"
+                  alt="Uploaded agent icon"
                   className="w-12 h-12 rounded-full object-cover"
                 />
               );
@@ -847,21 +847,19 @@ export function AssistantEditor({
                 <p className="text-base font-normal text-2xl">
                   {existingPersona ? (
                     <>
-                      Edit assistant <b>{existingPersona.name}</b>
+                      Edit Agent <b>{existingPersona.name}</b>
                     </>
                   ) : (
-                    "Create an Assistant"
+                    "Create an Agent"
                   )}
                 </p>
                 <div className="max-w-4xl w-full">
                   <Separator />
                   <div className="flex gap-x-2 items-center">
-                    <div className="block font-medium text-sm">
-                      Assistant Icon
-                    </div>
+                    <div className="block font-medium text-sm">Agent Icon</div>
                   </div>
                   <SubLabel>
-                    The icon that will visually represent your Assistant
+                    The icon that will visually represent your Agent
                   </SubLabel>
                   <div className="flex gap-x-2 items-center">
                     <div
@@ -1031,11 +1029,11 @@ export function AssistantEditor({
 
                                     {ccPairs.length === 0 && (
                                       <TooltipContent side="top" align="center">
-                                        <p className="bg-background-900 max-w-[200px] text-sm rounded-lg p-1.5 text-white">
+                                        <Text inverted>
                                           To use the Knowledge Action, you need
                                           to have at least one Connector
                                           configured.
-                                        </p>
+                                        </Text>
                                       </TooltipContent>
                                     )}
                                   </Tooltip>
@@ -1106,22 +1104,24 @@ export function AssistantEditor({
                             <div className="text-sm flex flex-col items-start">
                               <SubLabel>Click below to add files</SubLabel>
                               {values.user_file_ids.length > 0 && (
-                                <div className="flex gap-3 mb-2">
+                                <div className="flex gap-spacing-inline">
                                   {values.user_file_ids
-                                    .slice(0, 3)
+                                    .slice(0, 4)
                                     .map((userFileId: string) => {
-                                      const rf = recentFiles.find(
+                                      const rf = allRecentFiles.find(
                                         (f) => f.id === userFileId
                                       );
+
                                       const fileData = rf || {
                                         id: userFileId,
                                         name: `File ${userFileId.slice(0, 8)}`,
                                         status: "completed" as const,
                                       };
                                       return (
-                                        <div key={userFileId} className="w-52">
+                                        <div key={userFileId} className="w-40">
                                           <FileCard
                                             file={fileData as ProjectFile}
+                                            hideProcessingState
                                             removeFile={() => {
                                               setFieldValue(
                                                 "user_file_ids",
@@ -1135,31 +1135,32 @@ export function AssistantEditor({
                                         </div>
                                       );
                                     })}
-                                  {values.user_file_ids.length > 3 && (
+                                  {values.user_file_ids.length > 4 && (
                                     <button
                                       type="button"
-                                      className="rounded-xl px-3 py-1 text-left bg-transparent hover:bg-accent-background-hovered hover:dark:bg-neutral-800/75 transition-colors"
+                                      className="rounded-xl px-3 py-1 text-left transition-colors hover:bg-background-tint-02"
                                       onClick={() => setShowAllUserFiles(true)}
                                     >
                                       <div className="flex flex-col overflow-hidden h-12 p-1">
                                         <div className="flex items-center justify-between gap-2 w-full">
-                                          <span className="text-onyx-medium text-sm truncate flex-1">
+                                          <Text text04 secondaryAction>
                                             View All
-                                          </span>
-                                          <MultipleFilesIcon className="h-5 w-5 text-onyx-medium" />
+                                          </Text>
+                                          <SvgFiles className="h-5 w-5 stroke-text-02" />
                                         </div>
-                                        <span className="text-onyx-muted text-sm">
+                                        <Text text03 secondaryBody>
                                           {values.user_file_ids.length} files
-                                        </span>
+                                        </Text>
                                       </div>
                                     </button>
                                   )}
                                 </div>
                               )}
                               <FilePicker
-                                showTriggerLabel
-                                triggerLabel="Add User  Files"
-                                recentFiles={recentFiles}
+                                trigger={
+                                  <CreateButton>Add User Files</CreateButton>
+                                }
+                                recentFiles={allRecentFiles}
                                 onFileClick={(file: ProjectFile) => {
                                   setPresentingDocument({
                                     document_id: `project_file__${file.file_id}`,
@@ -1174,30 +1175,89 @@ export function AssistantEditor({
                                     ]);
                                   }
                                 }}
+                                onUnpickRecent={(file: ProjectFile) => {
+                                  if (values.user_file_ids.includes(file.id)) {
+                                    setFieldValue(
+                                      "user_file_ids",
+                                      values.user_file_ids.filter(
+                                        (id: string) => id !== file.id
+                                      )
+                                    );
+                                  }
+                                }}
                                 handleUploadChange={async (
                                   e: React.ChangeEvent<HTMLInputElement>
                                 ) => {
                                   const files = e.target.files;
                                   if (!files || files.length === 0) return;
-
                                   try {
-                                    const uploaded = await uploadProjectFiles(
-                                      Array.from(files)
+                                    // Use a local tracker to avoid stale closures inside onSuccess
+                                    let selectedIds = [
+                                      ...(values.user_file_ids || []),
+                                    ];
+                                    const optimistic = await beginUpload(
+                                      Array.from(files),
+                                      null,
+                                      setPopup,
+                                      (result) => {
+                                        const uploadedFiles =
+                                          result.user_files || [];
+                                        if (uploadedFiles.length === 0) return;
+                                        const tempToFinal = new Map(
+                                          uploadedFiles
+                                            .filter((f) => f.temp_id)
+                                            .map((f) => [
+                                              f.temp_id as string,
+                                              f.id,
+                                            ])
+                                        );
+                                        const replaced = (
+                                          selectedIds || []
+                                        ).map(
+                                          (id: string) =>
+                                            tempToFinal.get(id) ?? id
+                                        );
+                                        const deduped = Array.from(
+                                          new Set(replaced)
+                                        );
+                                        setFieldValue("user_file_ids", deduped);
+                                        selectedIds = deduped;
+                                      },
+                                      (failedTempIds) => {
+                                        if (
+                                          !failedTempIds ||
+                                          failedTempIds.length === 0
+                                        )
+                                          return;
+                                        const filtered = (
+                                          selectedIds || []
+                                        ).filter(
+                                          (id: string) =>
+                                            !failedTempIds.includes(id)
+                                        );
+                                        setFieldValue(
+                                          "user_file_ids",
+                                          filtered
+                                        );
+                                        selectedIds = filtered;
+                                      }
                                     );
-                                    const newIds = uploaded.user_files.map(
+                                    const optimisticIds = optimistic.map(
                                       (f) => f.id
                                     );
                                     const merged = Array.from(
                                       new Set([
-                                        ...(values.user_file_ids || []),
-                                        ...newIds,
+                                        ...(selectedIds || []),
+                                        ...optimisticIds,
                                       ])
                                     );
                                     setFieldValue("user_file_ids", merged);
+                                    selectedIds = merged;
                                   } finally {
                                     e.target.value = "";
                                   }
                                 }}
+                                selectedFileIds={values.user_file_ids}
                               />
                             </div>
                           )}
@@ -1223,9 +1283,9 @@ export function AssistantEditor({
                                         ) : (
                                           "Team Document Sets"
                                         )}{" "}
-                                        this Assistant should use to inform its
+                                        this Agent should use to inform its
                                         responses. If none are specified, the
-                                        Assistant will reference all available
+                                        Agent will reference all available
                                         documents.
                                       </>
                                     </SubLabel>
@@ -1297,7 +1357,7 @@ export function AssistantEditor({
                                   disabled={!currentLLMSupportsImageOutput}
                                   disabledTooltip={
                                     !currentLLMSupportsImageOutput
-                                      ? "To use Image Generation, select GPT-4 or another image compatible model as the default model for this Assistant."
+                                      ? "To use Image Generation, select GPT-4 or another image compatible model as the default model for this Agent."
                                       : "Image Generation requires an OpenAI or Azure Dall-E configuration."
                                   }
                                 />
@@ -1437,8 +1497,8 @@ export function AssistantEditor({
                             }
                           }}
                           name="is_default_persona"
-                          label="Featured Assistant"
-                          subtext="If set, this assistant will be pinned for all new users and appear in the Featured list in the assistant explorer. This also makes the assistant public."
+                          label="Featured Agent"
+                          subtext="If set, this agent will be pinned for all new users and appear in the Featured list in the agent explorer. This also makes the agent public."
                         />
                       )}
 
@@ -1448,7 +1508,7 @@ export function AssistantEditor({
                         <div className="block font-medium text-sm">Access</div>
                       </div>
                       <SubLabel>
-                        Control who can access and use this assistant
+                        Control who can access and use this agent
                       </SubLabel>
 
                       <div className="min-h-[100px]">
@@ -1512,13 +1572,13 @@ export function AssistantEditor({
 
                         {values.is_public ? (
                           <p className="text-sm text-text-dark">
-                            This assistant will be available to everyone in your
+                            This agent will be available to everyone in your
                             organization
                           </p>
                         ) : (
                           <>
                             <p className="text-sm text-text-dark mb-2">
-                              This assistant will only be available to specific
+                              This agent will only be available to specific
                               users and groups
                             </p>
                             <div className="mt-2">
@@ -1630,9 +1690,8 @@ export function AssistantEditor({
 
                       <SubLabel>
                         Sample messages that help users understand what this
-                        assistant can do and how to interact with it
-                        effectively. New input fields will appear automatically
-                        as you type.
+                        agent can do and how to interact with it effectively.
+                        New input fields will appear automatically as you type.
                       </SubLabel>
 
                       <div className="w-full">
@@ -1665,7 +1724,7 @@ export function AssistantEditor({
                         className="text-sm text-subtle"
                         style={{ color: "rgb(113, 114, 121)" }}
                       >
-                        Select labels to categorize this assistant
+                        Select labels to categorize this agent
                       </p>
                       <div className="mt-3">
                         <SearchMultiSelectDropdown
@@ -1810,7 +1869,7 @@ export function AssistantEditor({
                       removeIndent
                       name="datetime_aware"
                       label="Date and Time Aware"
-                      subtext='Toggle this option to let the assistant know the current date and time (formatted like: "Thursday Jan 1, 1970 00:01"). To inject it in a specific place in the prompt, use the pattern [[CURRENT_DATETIME]]'
+                      subtext='Toggle this option to let the agent know the current date and time (formatted like: "Thursday Jan 1, 1970 00:01"). To inject it in a specific place in the prompt, use the pattern [[CURRENT_DATETIME]]'
                     />
 
                     <Separator />
@@ -1828,7 +1887,17 @@ export function AssistantEditor({
                     )}
                   </div>
                   <div className="flex gap-x-2 items-center">
-                    <Button disabled={isSubmitting || isRequestSuccessful}>
+                    <Button
+                      disabled={
+                        isSubmitting ||
+                        isRequestSuccessful ||
+                        (values.user_file_ids || []).some(
+                          (id: string) =>
+                            id.startsWith("temp_") || id.includes("temp_")
+                        )
+                      }
+                      type="submit"
+                    >
                       {isUpdate ? "Update" : "Create"}
                     </Button>
                     <Button secondary onClick={() => router.back()}>
@@ -1837,22 +1906,20 @@ export function AssistantEditor({
                   </div>
                 </div>
               </Form>
-              <Dialog
-                open={showAllUserFiles}
-                onOpenChange={setShowAllUserFiles}
-              >
-                <DialogContent className="w-full max-w-lg">
-                  <DialogHeader>
-                    <OpenFolderIcon size={32} />
-                    <DialogTitle>User Files</DialogTitle>
-                    <DialogDescription>
-                      All files selected for this assistant
-                    </DialogDescription>
-                  </DialogHeader>
-                  <FilesList
+              {showAllUserFiles && (
+                <CoreModal
+                  className="w-full max-w-lg"
+                  onClickOutside={() => setShowAllUserFiles(false)}
+                >
+                  <UserFilesModalContent
+                    title="User Files"
+                    description="All files selected for this assistant"
+                    icon={SvgFiles}
                     recentFiles={values.user_file_ids.map(
                       (userFileId: string) => {
-                        const rf = recentFiles.find((f) => f.id === userFileId);
+                        const rf = allRecentFiles.find(
+                          (f) => f.id === userFileId
+                        );
                         return (
                           rf || {
                             id: userFileId,
@@ -1871,9 +1938,10 @@ export function AssistantEditor({
                         )
                       );
                     }}
+                    onClose={() => setShowAllUserFiles(false)}
                   />
-                </DialogContent>
-              </Dialog>
+                </CoreModal>
+              )}
             </>
           );
         }}

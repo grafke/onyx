@@ -34,6 +34,13 @@ export interface ProjectFile {
   chat_file_type: ChatFileType;
   token_count: number | null;
   chunk_count: number | null;
+  temp_id?: string | null;
+}
+
+export interface UserFileDeleteResult {
+  has_associations: boolean;
+  project_names: string[];
+  assistant_names: string[];
 }
 
 export enum UserFileStatus {
@@ -42,6 +49,7 @@ export enum UserFileStatus {
   COMPLETED = "COMPLETED",
   FAILED = "FAILED",
   CANCELED = "CANCELED",
+  DELETING = "DELETING",
 }
 
 export type ProjectDetails = {
@@ -71,12 +79,19 @@ export async function createProject(name: string): Promise<Project> {
 
 export async function uploadFiles(
   files: File[],
-  projectId?: number | null
+  projectId?: number | null,
+  tempIdMap?: Map<string, string>
 ): Promise<CategorizedFiles> {
   const formData = new FormData();
   files.forEach((file) => formData.append("files", file));
   if (projectId !== undefined && projectId !== null) {
     formData.append("project_id", String(projectId));
+  }
+  if (tempIdMap !== undefined && tempIdMap !== null) {
+    formData.append(
+      "temp_id_map",
+      JSON.stringify(Object.fromEntries(tempIdMap))
+    );
   }
 
   const response = await fetch("/api/user/projects/file/upload", {
@@ -181,35 +196,38 @@ export async function getProjectDetails(
 export async function unlinkFileFromProject(
   projectId: number,
   fileId: string
-): Promise<void> {
+): Promise<Response> {
   const response = await fetch(
-    `/api/user/projects/${encodeURIComponent(projectId)}/files/${encodeURIComponent(
-      fileId
-    )}`,
+    `/api/user/projects/${encodeURIComponent(
+      projectId
+    )}/files/${encodeURIComponent(fileId)}`,
     { method: "DELETE" }
   );
   if (!response.ok) {
     handleRequestError("Unlink file from project", response);
   }
+  return response;
 }
 
 export async function linkFileToProject(
   projectId: number,
   fileId: string
-): Promise<ProjectFile> {
+): Promise<Response> {
   const response = await fetch(
-    `/api/user/projects/${encodeURIComponent(projectId)}/files/${encodeURIComponent(
-      fileId
-    )}`,
+    `/api/user/projects/${encodeURIComponent(
+      projectId
+    )}/files/${encodeURIComponent(fileId)}`,
     { method: "POST" }
   );
   if (!response.ok) {
     handleRequestError("Link file to project", response);
   }
-  return response.json();
+  return response;
 }
 
-export async function deleteUserFile(fileId: string): Promise<void> {
+export async function deleteUserFile(
+  fileId: string
+): Promise<UserFileDeleteResult> {
   const response = await fetch(
     `/api/user/projects/file/${encodeURIComponent(fileId)}`,
     {
@@ -219,6 +237,7 @@ export async function deleteUserFile(fileId: string): Promise<void> {
   if (!response.ok) {
     handleRequestError("Delete file", response);
   }
+  return (await response.json()) as UserFileDeleteResult;
 }
 
 export async function getUserFile(fileId: string): Promise<ProjectFile> {
@@ -249,7 +268,9 @@ export async function getSessionProjectTokenCount(
   chatSessionId: string
 ): Promise<number> {
   const response = await fetch(
-    `/api/user/projects/session/${encodeURIComponent(chatSessionId)}/token-count`
+    `/api/user/projects/session/${encodeURIComponent(
+      chatSessionId
+    )}/token-count`
   );
   if (!response.ok) {
     return 0;
