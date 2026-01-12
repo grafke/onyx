@@ -13,6 +13,11 @@ services:
     ports:
       - "8080:8080"
 
+  # Uncomment the block below to enable the MCP server for Onyx.
+  # mcp_server:
+  #   ports:
+  #     - "8090:8090"
+
   relational_db:
     ports:
       - "5432:5432"
@@ -21,6 +26,10 @@ services:
     ports:
       - "19071:19071"
       - "8081:8081"
+
+  inference_model_server:
+    ports:
+      - "9000:9000"
 
   cache:
     ports:
@@ -31,3 +40,7 @@ services:
     ports:
       - "9004:9000"
       - "9005:9001"
+
+  code-interpreter:
+    ports:
+      - "8000:8000"

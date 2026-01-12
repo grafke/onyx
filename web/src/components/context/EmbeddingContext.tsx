@@ -6,6 +6,7 @@ import React, {
   useEffect,
 } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import type { Route } from "next";
 
 interface EmbeddingFormContextType {
   formStep: number;
@@ -33,8 +34,8 @@ export const EmbeddingFormProvider: React.FC<{
   const pathname = usePathname();
 
   // Initialize formStep based on the URL parameter
-  const initialStep = parseInt(searchParams?.get("step") || "0", 10);
-  const [formStep, setFormStep] = useState(initialStep);
+  const stepFromUrl = parseInt(searchParams?.get("step") || "0", 10);
+  const [formStep, setFormStep] = useState(stepFromUrl);
   const [formValues, setFormValues] = useState<Record<string, any>>({});
 
   const [allowAdvanced, setAllowAdvanced] = useState(false);
@@ -63,19 +64,18 @@ export const EmbeddingFormProvider: React.FC<{
     const newUrl = `${pathname}?${updatedSearchParams.toString()}`;
 
     if (!existingStep) {
-      router.replace(newUrl);
+      router.replace(newUrl as Route);
     } else if (newUrl !== pathname) {
-      router.push(newUrl);
+      router.push(newUrl as Route);
     }
-  }, [formStep, router, pathname, searchParams]);
+  }, [formStep, router, pathname]);
 
   // Update formStep when URL changes
   useEffect(() => {
-    const stepFromUrl = parseInt(searchParams?.get("step") || "0", 10);
     if (stepFromUrl !== formStep) {
       setFormStep(stepFromUrl);
     }
-  }, [searchParams]);
+  }, [stepFromUrl]);
 
   const contextValue: EmbeddingFormContextType = {
     formStep,

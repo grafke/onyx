@@ -12,11 +12,13 @@ from functools import partial
 from typing import Any
 from typing import cast
 from typing import Protocol
+from urllib.parse import parse_qs
 from urllib.parse import urlparse
+from urllib.parse import urlunparse
 
-from google.auth.exceptions import RefreshError  # type: ignore
-from google.oauth2.credentials import Credentials as OAuthCredentials  # type: ignore
-from google.oauth2.service_account import Credentials as ServiceAccountCredentials  # type: ignore
+from google.auth.exceptions import RefreshError
+from google.oauth2.credentials import Credentials as OAuthCredentials
+from google.oauth2.service_account import Credentials as ServiceAccountCredentials
 from googleapiclient.errors import HttpError  # type: ignore
 from typing_extensions import override
 
@@ -41,6 +43,7 @@ from onyx.connectors.google_drive.file_retrieval import (
 )
 from onyx.connectors.google_drive.file_retrieval import get_files_in_shared_drive
 from onyx.connectors.google_drive.file_retrieval import get_root_folder_id
+from onyx.connectors.google_drive.file_retrieval import has_link_only_permission
 from onyx.connectors.google_drive.models import DriveRetrievalStage
 from onyx.connectors.google_drive.models import GoogleDriveCheckpoint
 from onyx.connectors.google_drive.models import GoogleDriveFileType
@@ -63,6 +66,7 @@ from onyx.connectors.google_utils.shared_constants import USER_FIELDS
 from onyx.connectors.interfaces import CheckpointedConnectorWithPermSync
 from onyx.connectors.interfaces import CheckpointOutput
 from onyx.connectors.interfaces import GenerateSlimDocumentOutput
+from onyx.connectors.interfaces import NormalizationResult
 from onyx.connectors.interfaces import SecondsSinceUnixEpoch
 from onyx.connectors.interfaces import SlimConnectorWithPermSync
 from onyx.connectors.models import ConnectorFailure
@@ -164,6 +168,7 @@ class GoogleDriveConnector(
         my_drive_emails: str | None = None,
         shared_folder_urls: str | None = None,
         specific_user_emails: str | None = None,
+        exclude_domain_link_only: bool = False,
         batch_size: int = INDEX_BATCH_SIZE,
         # OLD PARAMETERS
         folder_paths: list[str] | None = None,
@@ -232,6 +237,7 @@ class GoogleDriveConnector(
         self._specific_user_emails = _extract_str_list_from_comma_str(
             specific_user_emails
         )
+        self.exclude_domain_link_only = exclude_domain_link_only
 
         self._primary_admin_email: str | None = None
 
@@ -277,6 +283,54 @@ class GoogleDriveConnector(
                 "before calling load_credentials"
             )
         return self._creds
+
+    @classmethod
+    @override
+    def normalize_url(cls, url: str) -> NormalizationResult:
+        """Normalize a Google Drive URL to match the canonical Document.id format.
+
+        Reuses the connector's existing document ID creation logic from
+        onyx_document_id_from_drive_file.
+        """
+        parsed = urlparse(url)
+        netloc = parsed.netloc.lower()
+
+        if not (
+            netloc.startswith("docs.google.com")
+            or netloc.startswith("drive.google.com")
+        ):
+            return NormalizationResult(normalized_url=None, use_default=False)
+
+        # Handle ?id= query parameter case
+        query_params = parse_qs(parsed.query)
+        doc_id = query_params.get("id", [None])[0]
+        if doc_id:
+            scheme = parsed.scheme or "https"
+            netloc = "drive.google.com"
+            path = f"/file/d/{doc_id}"
+            params = ""
+            query = ""
+            fragment = ""
+            normalized = urlunparse(
+                (scheme, netloc, path, params, query, fragment)
+            ).rstrip("/")
+            return NormalizationResult(normalized_url=normalized, use_default=False)
+
+        # Extract file ID and use connector's function
+        path_parts = parsed.path.split("/")
+        file_id = None
+        for i, part in enumerate(path_parts):
+            if part == "d" and i + 1 < len(path_parts):
+                file_id = path_parts[i + 1]
+                break
+
+        if not file_id:
+            return NormalizationResult(normalized_url=None, use_default=False)
+
+        # Create minimal file object for connector function
+        file_obj = {"webViewLink": url, "id": file_id}
+        normalized = onyx_document_id_from_drive_file(file_obj).rstrip("/")
+        return NormalizationResult(normalized_url=normalized, use_default=False)
 
     # TODO: ensure returned new_creds_dict is actually persisted when this is called?
     def load_credentials(self, credentials: dict[str, Any]) -> dict[str, str] | None:
@@ -968,21 +1022,54 @@ class GoogleDriveConnector(
         )
 
         for file in drive_files:
-            document_id = onyx_document_id_from_drive_file(file.drive_file)
-            logger.debug(
-                f"Updating checkpoint for file: {file.drive_file.get('name')}. "
-                f"Seen: {document_id in checkpoint.all_retrieved_file_ids}"
-            )
-            checkpoint.completion_map[file.user_email].update(
+            drive_file = file.drive_file or {}
+            completion = checkpoint.completion_map[file.user_email]
+
+            completed_until = completion.completed_until
+            modified_time = drive_file.get(GoogleFields.MODIFIED_TIME.value)
+            if isinstance(modified_time, str):
+                try:
+                    completed_until = datetime.fromisoformat(modified_time).timestamp()
+                except ValueError:
+                    logger.warning(
+                        "Invalid modifiedTime for file '%s' (stage=%s, user=%s).",
+                        drive_file.get("id"),
+                        file.completion_stage,
+                        file.user_email,
+                    )
+
+            completion.update(
                 stage=file.completion_stage,
-                completed_until=datetime.fromisoformat(
-                    file.drive_file[GoogleFields.MODIFIED_TIME.value]
-                ).timestamp(),
+                completed_until=completed_until,
                 current_folder_or_drive_id=file.parent_id,
             )
-            if document_id not in checkpoint.all_retrieved_file_ids:
-                checkpoint.all_retrieved_file_ids.add(document_id)
+
+            if file.error is not None or not drive_file:
                 yield file
+                continue
+
+            try:
+                document_id = onyx_document_id_from_drive_file(drive_file)
+            except KeyError as exc:
+                logger.warning(
+                    "Drive file missing id/webViewLink (stage=%s user=%s). Skipping.",
+                    file.completion_stage,
+                    file.user_email,
+                )
+                if file.error is None:
+                    file.error = exc
+                yield file
+                continue
+
+            logger.debug(
+                f"Updating checkpoint for file: {drive_file.get('name')}. "
+                f"Seen: {document_id in checkpoint.all_retrieved_file_ids}"
+            )
+            if document_id in checkpoint.all_retrieved_file_ids:
+                continue
+
+            checkpoint.all_retrieved_file_ids.add(document_id)
+            yield file
 
     def _manage_oauth_retrieval(
         self,
@@ -1106,7 +1193,7 @@ class GoogleDriveConnector(
         """
         field_type = (
             DriveFileFieldType.WITH_PERMISSIONS
-            if include_permissions
+            if include_permissions or self.exclude_domain_link_only
             else DriveFileFieldType.STANDARD
         )
 
@@ -1172,6 +1259,10 @@ class GoogleDriveConnector(
                 start=start,
                 end=end,
             ):
+                if self.exclude_domain_link_only and has_link_only_permission(
+                    retrieved_file.drive_file
+                ):
+                    continue
                 if retrieved_file.error is None:
                     files_batch.append(retrieved_file)
                     continue
@@ -1276,6 +1367,10 @@ class GoogleDriveConnector(
         ):
             if file.error is not None:
                 raise file.error
+            if self.exclude_domain_link_only and has_link_only_permission(
+                file.drive_file
+            ):
+                continue
             if doc := build_slim_document(
                 self.creds,
                 file.drive_file,

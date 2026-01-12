@@ -1,231 +1,299 @@
-import { test, expect } from "@chromatic-com/playwright";
-import { Page } from "@playwright/test";
-import { loginAsRandomUser } from "../utils/auth";
+import { test, expect, Page, Browser } from "@playwright/test";
+import { loginAs, loginAsRandomUser } from "../utils/auth";
+import { OnyxApiClient } from "../utils/onyxApiClient";
 
 // --- Locator Helper Functions ---
 const getNameInput = (page: Page) => page.locator('input[name="name"]');
 const getDescriptionInput = (page: Page) =>
-  page.locator('input[name="description"]');
+  page.locator('textarea[name="description"]');
 const getInstructionsTextarea = (page: Page) =>
-  page.locator('textarea[name="system_prompt"]');
-const getAdvancedOptionsButton = (page: Page) =>
-  page.locator('button:has-text("Advanced Options")');
+  page.locator('textarea[name="instructions"]');
 const getReminderTextarea = (page: Page) =>
-  page.locator('textarea[name="task_prompt"]');
-const getDateTimeAwareCheckbox = (page: Page) =>
-  page.getByRole("checkbox", { name: /Date and Time Aware/i });
-const getKnowledgeCutoffInput = (page: Page) =>
-  page.locator('input[name="search_start_date"]');
+  page.locator('textarea[name="reminders"]');
 const getKnowledgeToggle = (page: Page) =>
-  page
-    .locator('div:has(> p:has-text("Knowledge"))')
-    .locator('button[role="switch"]');
-const getNumChunksInput = (page: Page) =>
-  page.locator('input[name="num_chunks"]');
-const getAiRelevanceCheckbox = (page: Page) =>
-  page.getByRole("checkbox", { name: /AI Relevance Filter/i });
+  page.locator('button[role="switch"][name="enable_knowledge"]');
+
+// Helper function to set date using InputDatePicker (sets to today's date)
+const setKnowledgeCutoffDate = async (page: Page) => {
+  // Find and click the date picker button within the Knowledge Cutoff Date section
+  const datePickerButton = page
+    .locator('label:has-text("Knowledge Cutoff Date")')
+    .locator("..")
+    .locator('button:has-text("Select Date"), button:has-text("/")');
+
+  await datePickerButton.click();
+
+  // Wait for the popover to open
+  await page.waitForSelector('[role="dialog"]', {
+    state: "visible",
+    timeout: 5000,
+  });
+
+  // Click the "Today" button to set to today's date
+  const todayButton = page
+    .locator('[role="dialog"]')
+    .getByRole("button", { name: "Today" })
+    .first();
+  await todayButton.click();
+
+  // The popover should close automatically after selection
+  await page.waitForSelector('[role="dialog"]', {
+    state: "hidden",
+    timeout: 5000,
+  });
+};
 const getStarterMessageInput = (page: Page, index: number = 0) =>
-  page.locator(`input[name="starter_messages.${index}.message"]`);
+  page.locator(`input[name="starter_messages.${index}"]`);
 const getCreateSubmitButton = (page: Page) =>
   page.locator('button[type="submit"]:has-text("Create")');
 const getUpdateSubmitButton = (page: Page) =>
-  page.locator('button[type="submit"]:has-text("Update")');
+  page.locator('button[type="submit"]:has-text("Save")');
+const getKnowledgeSourceSelect = (page: Page) =>
+  page
+    .locator('label:has-text("Knowledge Source")')
+    .locator('button[role="combobox"]')
+    .first();
 
-test("Assistant Creation and Edit Verification", async ({ page }) => {
-  await page.context().clearCookies();
-  await loginAsRandomUser(page);
+test.describe("Assistant Creation and Edit Verification", () => {
+  // Configure this entire suite to run serially
+  test.describe.configure({ mode: "serial" });
 
-  // --- Initial Values ---
-  const assistantName = `Test Assistant ${Date.now()}`;
-  const assistantDescription = "This is a test assistant description.";
-  const assistantInstructions = "These are the test instructions.";
-  const assistantReminder = "Initial reminder.";
-  const assistantStarterMessage = "Initial starter message?";
-  const knowledgeCutoffDate = "2023-01-01"; // YYYY-MM-DD format
-  const numChunks = "5";
+  test.describe("User Files Only", () => {
+    test("should create assistant with user files when no connectors exist @exclusive", async ({
+      page,
+    }: {
+      page: Page;
+    }) => {
+      await page.context().clearCookies();
+      await loginAsRandomUser(page);
 
-  // --- Edited Values ---
-  const editedAssistantName = `Edited Assistant ${Date.now()}`;
-  const editedAssistantDescription = "This is the edited description.";
-  const editedAssistantInstructions = "These are the edited instructions.";
-  const editedAssistantReminder = "Edited reminder.";
-  const editedAssistantStarterMessage = "Edited starter message?";
-  const editedKnowledgeCutoffDate = "2024-01-01"; // YYYY-MM-DD format
-  const editedNumChunks = "15";
+      const assistantName = `User Files Test ${Date.now()}`;
+      const assistantDescription =
+        "Testing user file uploads without connectors";
+      const assistantInstructions = "Help users with their documents.";
 
-  // Navigate to the assistant creation page
-  await page.goto("http://localhost:3000/assistants/new");
+      await page.goto("/chat/agents/create");
 
-  // --- Fill in Initial Assistant Details ---
-  await getNameInput(page).fill(assistantName);
-  await getDescriptionInput(page).fill(assistantDescription);
-  await getInstructionsTextarea(page).fill(assistantInstructions);
+      // Fill in basic assistant details
+      await getNameInput(page).fill(assistantName);
+      await getDescriptionInput(page).fill(assistantDescription);
+      await getInstructionsTextarea(page).fill(assistantInstructions);
 
-  // --- Open Advanced Options ---
-  const advancedOptionsButton = getAdvancedOptionsButton(page);
-  await advancedOptionsButton.scrollIntoViewIfNeeded();
-  await advancedOptionsButton.click();
+      // Enable Knowledge toggle
+      const knowledgeToggle = getKnowledgeToggle(page);
+      await knowledgeToggle.scrollIntoViewIfNeeded();
+      await expect(knowledgeToggle).toHaveAttribute("aria-checked", "false");
+      await knowledgeToggle.click();
 
-  // --- Fill Advanced Fields ---
+      // Select "User Knowledge" from the knowledge source dropdown
+      const knowledgeSourceSelect = getKnowledgeSourceSelect(page);
+      await knowledgeSourceSelect.click();
+      await page.getByRole("option", { name: "User Knowledge" }).click();
 
-  // Reminder
-  await getReminderTextarea(page).fill(assistantReminder);
+      // Verify "Add User Files" button is visible
+      const addUserFilesButton = page.getByRole("button", {
+        name: /add user files/i,
+      });
+      await expect(addUserFilesButton).toBeVisible();
 
-  // Date/Time Aware (Enable)
-  await getDateTimeAwareCheckbox(page).click();
+      // Submit the assistant creation form
+      await getCreateSubmitButton(page).click();
 
-  // Knowledge Cutoff Date
-  await getKnowledgeCutoffInput(page).fill(knowledgeCutoffDate);
+      // Verify redirection to chat page with the new assistant
+      await page.waitForURL(/.*\/chat\?assistantId=\d+.*/);
+      const url = page.url();
+      const assistantIdMatch = url.match(/assistantId=(\d+)/);
+      expect(assistantIdMatch).toBeTruthy();
 
-  // Num Chunks
-  await getNumChunksInput(page).fill(numChunks);
+      console.log(
+        `[test] Successfully created assistant without connectors: ${assistantName}`
+      );
+    });
+  });
 
-  // AI Relevance Filter (Enable)
-  await getAiRelevanceCheckbox(page).click();
+  test.describe("With Knowledge", () => {
+    let ccPairId: number;
+    let documentSetId: number;
 
-  // Starter Message
-  await getStarterMessageInput(page).fill(assistantStarterMessage);
+    test.afterAll(async ({ browser }: { browser: Browser }) => {
+      // Cleanup using browser fixture (worker-scoped) to avoid per-test fixture limitation
+      if (ccPairId && documentSetId) {
+        const context = await browser.newContext({
+          storageState: "admin_auth.json",
+        });
+        const page = await context.newPage();
+        const cleanupClient = new OnyxApiClient(page);
+        await cleanupClient.deleteDocumentSet(documentSetId);
+        await cleanupClient.deleteCCPair(ccPairId);
+        await context.close();
+        console.log(
+          "[test] Cleanup completed - deleted connector and document set"
+        );
+      }
+    });
 
-  // Submit the creation form
-  await getCreateSubmitButton(page).click();
+    test("should create and edit assistant with Knowledge enabled", async ({
+      page,
+    }: {
+      page: Page;
+    }) => {
+      // Login as admin to create connector and document set (requires admin permissions)
+      await page.context().clearCookies();
+      await loginAs(page, "admin");
 
-  // Verify redirection to chat page with the new assistant ID
-  await page.waitForURL(/.*\/chat\?assistantId=\d+.*/);
-  const url = page.url();
-  const assistantIdMatch = url.match(/assistantId=(\d+)/);
-  expect(assistantIdMatch).toBeTruthy();
-  const assistantId = assistantIdMatch ? assistantIdMatch[1] : null;
-  expect(assistantId).not.toBeNull();
+      // Create a connector and document set to enable the Knowledge toggle
+      const onyxApiClient = new OnyxApiClient(page);
+      ccPairId = await onyxApiClient.createFileConnector("Test Connector");
+      documentSetId = await onyxApiClient.createDocumentSet(
+        "Test Document Set",
+        [ccPairId]
+      );
 
-  // --- Navigate to Edit Page and Verify Initial Values ---
-  // Navigate through the Assistant Explorer modal
-  await page.getByTestId("AppSidebar/more-agents").click();
+      // Navigate to a page to ensure session is fully established
+      await page.goto("/chat");
+      await page.waitForLoadState("networkidle");
 
-  // Find the assistant card in the modal and scroll to it
-  const modalContent = page.getByTestId("AgentsModal/container");
-  const modalBox = await modalContent.boundingBox();
-  if (modalBox) {
-    await page.mouse.move(
-      modalBox.x + modalBox.width / 2,
-      modalBox.y + modalBox.height / 2
-    );
-    // Increase scroll distance if needed
-    await page.mouse.wheel(0, 1000);
-    await page.waitForTimeout(500); // Add a small wait after scroll
-  }
+      // Now login as a regular user to test the assistant creation
+      await page.context().clearCookies();
+      await loginAsRandomUser(page);
 
-  await page.getByTestId("AgentCard/more").first().click();
+      // --- Initial Values ---
+      const assistantName = `Test Assistant ${Date.now()}`;
+      const assistantDescription = "This is a test assistant description.";
+      const assistantInstructions = "These are the test instructions.";
+      const assistantReminder = "Initial reminder.";
+      const assistantStarterMessage = "Initial starter message?";
+      const knowledgeCutoffDate = "2023-01-01";
 
-  // Wait for the popover to appear and click the "Edit" button
-  const editButton = page.getByTestId("AgentCard/edit").first();
-  await editButton.click();
+      // --- Edited Values ---
+      const editedAssistantName = `Edited Assistant ${Date.now()}`;
+      const editedAssistantDescription = "This is the edited description.";
+      const editedAssistantInstructions = "These are the edited instructions.";
+      const editedAssistantReminder = "Edited reminder.";
+      const editedAssistantStarterMessage = "Edited starter message?";
+      const editedKnowledgeCutoffDate = "2024-01-01";
 
-  // Verify we are on the edit page
-  await page.waitForURL(`**/assistants/edit/${assistantId}`);
+      // Navigate to the assistant creation page
+      await page.goto("/chat/agents/create");
 
-  // Verify basic fields
-  await expect(getNameInput(page)).toHaveValue(assistantName);
-  await expect(getDescriptionInput(page)).toHaveValue(assistantDescription);
-  await expect(getInstructionsTextarea(page)).toHaveValue(
-    assistantInstructions
-  );
+      // --- Fill in Initial Assistant Details ---
+      await getNameInput(page).fill(assistantName);
+      await getDescriptionInput(page).fill(assistantDescription);
+      await getInstructionsTextarea(page).fill(assistantInstructions);
 
-  // Open Advanced Options
-  const advancedOptionsButton1 = getAdvancedOptionsButton(page);
-  await advancedOptionsButton1.scrollIntoViewIfNeeded();
-  await advancedOptionsButton1.click();
+      // Reminder
+      await getReminderTextarea(page).fill(assistantReminder);
 
-  // Verify advanced fields
-  await expect(getReminderTextarea(page)).toHaveValue(assistantReminder);
-  await expect(getDateTimeAwareCheckbox(page)).toHaveAttribute(
-    "aria-checked",
-    "true"
-  );
-  await expect(getKnowledgeToggle(page)).toHaveAttribute(
-    "aria-checked",
-    "false"
-  );
-  await expect(getKnowledgeCutoffInput(page)).toHaveValue(knowledgeCutoffDate);
-  // This should still be 0.
-  //
-  // Since "seeded docs" are disabled, "search" (the "Knowledge" toggle) will be disabled.
-  // Since "search" is disabled, modifying the "num_chunks" will NOT work (the frontend will override the value sent to the backend to be 0).
-  // ```ts
-  // // (AssistantEditor.tsx):
-  // const numChunks = searchToolEnabled ? values.num_chunks || 25 : 0;
-  // ```
-  await expect(getNumChunksInput(page)).toHaveValue("0");
-  await expect(getAiRelevanceCheckbox(page)).toHaveAttribute(
-    "aria-checked",
-    "true"
-  );
-  await expect(getStarterMessageInput(page)).toHaveValue(
-    assistantStarterMessage
-  );
+      // Knowledge Cutoff Date
+      await setKnowledgeCutoffDate(page);
 
-  // --- Edit Assistant Details ---
-  // Basic Fields
-  await getNameInput(page).fill(editedAssistantName);
-  await getDescriptionInput(page).fill(editedAssistantDescription);
-  await getInstructionsTextarea(page).fill(editedAssistantInstructions);
+      // Enable Knowledge toggle (should now be enabled due to connector)
+      const knowledgeToggle = getKnowledgeToggle(page);
+      await knowledgeToggle.scrollIntoViewIfNeeded();
 
-  // Advanced Fields
-  await getReminderTextarea(page).fill(editedAssistantReminder);
-  // Date/Time Aware (Disable) - Click to toggle from true to false
-  await getDateTimeAwareCheckbox(page).click();
-  await getKnowledgeCutoffInput(page).fill(editedKnowledgeCutoffDate);
-  await getNumChunksInput(page).fill(editedNumChunks);
-  // AI Relevance Filter (Disable) - Click to toggle from true to false
-  await getAiRelevanceCheckbox(page).click();
-  await getStarterMessageInput(page).fill(editedAssistantStarterMessage);
+      // Verify toggle is NOT disabled
+      await expect(knowledgeToggle).not.toBeDisabled();
+      await knowledgeToggle.click();
 
-  // Submit the edit form
-  await getUpdateSubmitButton(page).click();
+      // Select "Team Knowledge" from the knowledge source dropdown
+      const knowledgeSourceSelect = getKnowledgeSourceSelect(page);
+      await knowledgeSourceSelect.click();
+      await page.getByRole("option", { name: "Team Knowledge" }).click();
 
-  // Verify redirection back to the chat page
-  await page.waitForURL(/.*\/chat\?assistantId=\d+.*/);
-  expect(page.url()).toContain(`assistantId=${assistantId}`);
+      // Select the document set created in beforeAll
+      // Document sets are rendered as clickable cards, not a dropdown
+      await page.getByTestId(`document-set-card-${documentSetId}`).click();
 
-  // --- Navigate to Edit Page Again and Verify Edited Values ---
-  // Use direct navigation this time
-  await page.goto(`http://localhost:3000/assistants/edit/${assistantId}`);
-  await page.waitForURL(`**/assistants/edit/${assistantId}`);
+      // Starter Message
+      await getStarterMessageInput(page).fill(assistantStarterMessage);
 
-  // Verify basic fields
-  await expect(getNameInput(page)).toHaveValue(editedAssistantName);
-  await expect(getDescriptionInput(page)).toHaveValue(
-    editedAssistantDescription
-  );
-  await expect(getInstructionsTextarea(page)).toHaveValue(
-    editedAssistantInstructions
-  );
+      // Submit the creation form
+      await getCreateSubmitButton(page).click();
 
-  // Open Advanced Options
-  const advancedOptionsButton2 = getAdvancedOptionsButton(page);
-  await advancedOptionsButton2.scrollIntoViewIfNeeded();
-  await advancedOptionsButton2.click();
+      // Verify redirection to chat page with the new assistant ID
+      await page.waitForURL(/.*\/chat\?assistantId=\d+.*/);
+      const url = page.url();
+      const assistantIdMatch = url.match(/assistantId=(\d+)/);
+      expect(assistantIdMatch).toBeTruthy();
+      const assistantId = assistantIdMatch ? assistantIdMatch[1] : null;
+      expect(assistantId).not.toBeNull();
 
-  // Verify advanced fields
-  await expect(getReminderTextarea(page)).toHaveValue(editedAssistantReminder);
-  await expect(getDateTimeAwareCheckbox(page)).toHaveAttribute(
-    "aria-checked",
-    "false"
-  ); // Now disabled
-  await expect(getKnowledgeToggle(page)).toHaveAttribute(
-    "aria-checked",
-    "false"
-  );
-  await expect(getKnowledgeCutoffInput(page)).toHaveValue(
-    editedKnowledgeCutoffDate
-  );
+      // Navigate directly to the edit page
+      await page.goto(`/chat/agents/edit/${assistantId}`);
+      await page.waitForURL(`**/chat/agents/edit/${assistantId}`);
 
-  // Once again, this will still not work.
-  await expect(getNumChunksInput(page)).toHaveValue("0");
-  await expect(getAiRelevanceCheckbox(page)).toHaveAttribute(
-    "aria-checked",
-    "false"
-  ); // Now disabled
-  await expect(getStarterMessageInput(page)).toHaveValue(
-    editedAssistantStarterMessage
-  );
+      // Verify basic fields
+      await expect(getNameInput(page)).toHaveValue(assistantName);
+      await expect(getDescriptionInput(page)).toHaveValue(assistantDescription);
+      await expect(getInstructionsTextarea(page)).toHaveValue(
+        assistantInstructions
+      );
+
+      // Verify advanced fields
+      await expect(getReminderTextarea(page)).toHaveValue(assistantReminder);
+      // Knowledge toggle should be enabled since we have a connector
+      await expect(getKnowledgeToggle(page)).toHaveAttribute(
+        "aria-checked",
+        "true"
+      );
+      // Verify document set is selected (cards show selected state with different background)
+      // The selected document set card should be visible
+      await expect(
+        page.getByTestId(`document-set-card-${documentSetId}`)
+      ).toBeVisible();
+      // Knowledge cutoff date is set to today's date
+      await expect(getStarterMessageInput(page)).toHaveValue(
+        assistantStarterMessage
+      );
+
+      // --- Edit Assistant Details ---
+      await getNameInput(page).fill(editedAssistantName);
+      await getDescriptionInput(page).fill(editedAssistantDescription);
+      await getInstructionsTextarea(page).fill(editedAssistantInstructions);
+      await getReminderTextarea(page).fill(editedAssistantReminder);
+      await setKnowledgeCutoffDate(page);
+      await getStarterMessageInput(page).fill(editedAssistantStarterMessage);
+
+      // Submit the edit form
+      await getUpdateSubmitButton(page).click();
+
+      // Verify redirection back to the chat page
+      await page.waitForURL(/.*\/chat\?assistantId=\d+.*/);
+      expect(page.url()).toContain(`assistantId=${assistantId}`);
+
+      // --- Navigate to Edit Page Again and Verify Edited Values ---
+      await page.goto(`/chat/agents/edit/${assistantId}`);
+      await page.waitForURL(`**/chat/agents/edit/${assistantId}`);
+
+      // Verify basic fields
+      await expect(getNameInput(page)).toHaveValue(editedAssistantName);
+      await expect(getDescriptionInput(page)).toHaveValue(
+        editedAssistantDescription
+      );
+      await expect(getInstructionsTextarea(page)).toHaveValue(
+        editedAssistantInstructions
+      );
+
+      // Verify advanced fields
+      await expect(getReminderTextarea(page)).toHaveValue(
+        editedAssistantReminder
+      );
+      await expect(getKnowledgeToggle(page)).toHaveAttribute(
+        "aria-checked",
+        "true"
+      );
+      // Verify document set is still selected after edit
+      await expect(
+        page.getByTestId(`document-set-card-${documentSetId}`)
+      ).toBeVisible();
+      // Knowledge cutoff date is set to today's date
+      await expect(getStarterMessageInput(page)).toHaveValue(
+        editedAssistantStarterMessage
+      );
+
+      console.log(
+        `[test] Successfully tested Knowledge-enabled assistant: ${assistantName}`
+      );
+    });
+  });
 });

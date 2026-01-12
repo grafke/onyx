@@ -2,16 +2,12 @@
 
 import { ArrayHelpers, FieldArray, FormikProps, useField } from "formik";
 import { ModelConfiguration } from "./interfaces";
-import {
-  ManualErrorMessage,
-  SubLabel,
-  TextFormField,
-} from "@/components/Field";
-import { FiPlus, FiX } from "react-icons/fi";
-import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
+import { ManualErrorMessage, TextFormField } from "@/components/Field";
 import { useEffect, useState } from "react";
-
+import CreateButton from "@/refresh-components/buttons/CreateButton";
+import IconButton from "@/refresh-components/buttons/IconButton";
+import { SvgX } from "@opal/icons";
+import Text from "@/refresh-components/texts/Text";
 function ModelConfigurationRow({
   name,
   index,
@@ -57,24 +53,18 @@ function ModelConfigurationRow({
           min={1}
         />
       </div>
-      <div className="flex items-end">
-        <div
-          className={`${
-            formikProps.values.model_configurations.length >= 2
-              ? ""
-              : "opacity-20"
-          }`}
-        >
-          <FiX
-            className="w-10 h-10 cursor-pointer hover:bg-accent-background-hovered rounded p-2"
-            onClick={() => {
-              if (formikProps.values.model_configurations.length > 1) {
-                setError(null);
-                arrayHelpers.remove(index);
-              }
-            }}
-          />
-        </div>
+      <div className="flex flex-col justify-center">
+        <IconButton
+          disabled={formikProps.values.model_configurations.length <= 1}
+          onClick={() => {
+            if (formikProps.values.model_configurations.length > 1) {
+              setError(null);
+              arrayHelpers.remove(index);
+            }
+          }}
+          icon={SvgX}
+          secondary
+        />
       </div>
     </div>
   );
@@ -93,10 +83,12 @@ export function ModelConfigurationField({
   return (
     <div className="pb-5 flex flex-col w-full">
       <div className="flex flex-col">
-        <Label className="text-md">Model Configurations</Label>
-        <SubLabel>
+        <Text as="p" mainUiAction>
+          Model Configurations
+        </Text>
+        <Text as="p" secondaryBody text03>
           Add models and customize the number of input tokens that they accept.
-        </SubLabel>
+        </Text>
       </div>
       <FieldArray
         name={name}
@@ -104,8 +96,12 @@ export function ModelConfigurationField({
           <div className="flex flex-col">
             <div className="flex flex-col gap-4 py-4">
               <div className="flex">
-                <Label className="flex flex-[2]">Model Name</Label>
-                <Label className="flex flex-[1]">Max Input Tokens</Label>
+                <Text as="p" secondaryBody className="flex flex-[2]">
+                  Model Name
+                </Text>
+                <Text as="p" secondaryBody className="flex flex-[1]">
+                  Max Input Tokens
+                </Text>
                 <div className="w-10" />
               </div>
               {formikProps.values.model_configurations.map((_, index) => (
@@ -145,21 +141,20 @@ export function ModelConfigurationField({
               <ManualErrorMessage>{finalError}</ManualErrorMessage>
             )}
             <div>
-              <Button
+              <CreateButton
                 onClick={() => {
                   arrayHelpers.push({
                     name: "",
                     is_visible: true,
-                    max_input_tokens: "",
+                    // Use null so Yup.number().nullable() accepts empty inputs
+                    max_input_tokens: null,
                   });
                 }}
                 className="mt-3"
-                variant="next"
                 type="button"
-                icon={FiPlus}
               >
                 Add New
-              </Button>
+              </CreateButton>
             </div>
           </div>
         )}

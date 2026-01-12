@@ -2,7 +2,6 @@
 
 import * as React from "react";
 import * as TooltipPrimitive from "@radix-ui/react-tooltip";
-
 import { cn } from "@/lib/utils";
 
 // Default the provider delay to a snappier, consistent value
@@ -26,14 +25,22 @@ const TooltipTrigger = React.forwardRef<
 ));
 TooltipTrigger.displayName = TooltipPrimitive.Trigger.displayName;
 
+type TooltipSize = "sm" | "md" | "lg";
+
+const tooltipSizeClasses: Record<TooltipSize, string> = {
+  sm: "px-2 py-1 max-w-[12rem]",
+  md: "px-3 py-2 max-w-[20rem]",
+  lg: "px-3 py-2 max-w-[30rem]",
+};
+
 const TooltipContent = React.forwardRef<
   React.ElementRef<typeof TooltipPrimitive.Content>,
   React.ComponentPropsWithoutRef<typeof TooltipPrimitive.Content> & {
     width?: string;
-    backgroundColor?: string;
     showTick?: boolean;
     tickSide?: "top" | "bottom" | "left" | "right";
     side?: "top" | "bottom" | "left" | "right";
+    size?: TooltipSize;
   }
 >(
   (
@@ -41,44 +48,41 @@ const TooltipContent = React.forwardRef<
       className,
       sideOffset = 4,
       width,
-      backgroundColor,
       showTick = false,
       tickSide = "bottom",
       side = "top",
+      size = "lg",
       ...props
     },
     ref
   ) => (
-    <TooltipPrimitive.Content
-      ref={ref}
-      sideOffset={sideOffset}
-      side={side}
-      className={cn(
-        `z-[100] rounded-08 ${
-          backgroundColor || "bg-background-neutral-inverted-03"
-        }
-        ${width}
-      text-wrap
-       p-padding-button shadow-lg animate-in fade-in-0 zoom-in-95 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2`,
-        className
-      )}
-      {...props}
-    >
-      {showTick && (
-        <div
-          className={`absolute w-2 h-2 bg-inherit rotate-45 ${
-            tickSide === "top"
-              ? "-top-1 left-1/2 -translate-x-1/2"
-              : tickSide === "bottom"
-                ? "-bottom-1 left-1/2 -translate-x-1/2"
-                : tickSide === "left"
-                  ? "-left-1 top-1/2 -translate-y-1/2"
-                  : "-right-1 top-1/2 -translate-y-1/2"
-          }`}
-        />
-      )}
-      {props.children}
-    </TooltipPrimitive.Content>
+    <TooltipPrimitive.Portal>
+      <TooltipPrimitive.Content
+        ref={ref}
+        sideOffset={sideOffset}
+        side={side}
+        className={cn(
+          "z-tooltip rounded-08 text-text-light-05 animate-in fade-in-0 zoom-in-95 bg-background-neutral-dark-03 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2",
+          tooltipSizeClasses[size],
+          width,
+          className
+        )}
+        {...props}
+      >
+        {showTick && (
+          <div
+            className={cn(
+              "absolute w-2 h-2 bg-inherit rotate-45",
+              tickSide === "top" && "-top-1 left-1/2 -translate-x-1/2",
+              tickSide === "bottom" && "-bottom-1 left-1/2 -translate-x-1/2",
+              tickSide === "left" && "-left-1 top-1/2 -translate-y-1/2",
+              tickSide === "right" && "-right-1 top-1/2 -translate-y-1/2"
+            )}
+          />
+        )}
+        {props.children}
+      </TooltipPrimitive.Content>
+    </TooltipPrimitive.Portal>
   )
 );
 TooltipContent.displayName = TooltipPrimitive.Content.displayName;

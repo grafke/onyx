@@ -61,6 +61,7 @@ from onyx.db.user_preferences import update_user_pinned_assistants
 from onyx.db.user_preferences import update_user_role
 from onyx.db.user_preferences import update_user_shortcut_enabled
 from onyx.db.user_preferences import update_user_temperature_override_enabled
+from onyx.db.user_preferences import update_user_theme_preference
 from onyx.db.users import delete_user_from_db
 from onyx.db.users import get_all_users
 from onyx.db.users import get_page_of_filtered_users
@@ -76,6 +77,7 @@ from onyx.server.manage.models import AutoScrollRequest
 from onyx.server.manage.models import PersonalizationUpdateRequest
 from onyx.server.manage.models import TenantInfo
 from onyx.server.manage.models import TenantSnapshot
+from onyx.server.manage.models import ThemePreferenceRequest
 from onyx.server.manage.models import UserByEmail
 from onyx.server.manage.models import UserInfo
 from onyx.server.manage.models import UserPreferences
@@ -87,6 +89,7 @@ from onyx.server.models import FullUserSnapshot
 from onyx.server.models import InvitedUserSnapshot
 from onyx.server.models import MinimalUserSnapshot
 from onyx.server.utils import BasicAuthenticationError
+from onyx.server.utils import PUBLIC_API_TAGS
 from onyx.utils.logger import setup_logger
 from onyx.utils.variable_functionality import fetch_ee_implementation_or_noop
 from onyx.utils.variable_functionality import (
@@ -101,7 +104,7 @@ router = APIRouter()
 USERS_PAGE_SIZE = 10
 
 
-@router.patch("/manage/set-user-role")
+@router.patch("/manage/set-user-role", tags=PUBLIC_API_TAGS)
 def set_user_role(
     user_role_update_request: UserRoleUpdateRequest,
     current_user: User = Depends(current_admin_user),
@@ -157,7 +160,7 @@ async def test_upsert_user(
     return FullUserSnapshot.from_user_model(user) if user else None
 
 
-@router.get("/manage/users/accepted")
+@router.get("/manage/users/accepted", tags=PUBLIC_API_TAGS)
 def list_accepted_users(
     q: str | None = Query(default=None),
     page_num: int = Query(0, ge=0),
@@ -198,16 +201,23 @@ def list_accepted_users(
     )
 
 
-@router.get("/manage/users/invited")
+@router.get("/manage/users/invited", tags=PUBLIC_API_TAGS)
 def list_invited_users(
     _: User | None = Depends(current_admin_user),
+    db_session: Session = Depends(get_session),
 ) -> list[InvitedUserSnapshot]:
     invited_emails = get_invited_users()
 
-    return [InvitedUserSnapshot(email=email) for email in invited_emails]
+    # Filter out users who are already active in the system
+    active_user_emails = {user.email for user in get_all_users(db_session)}
+    filtered_invited_emails = [
+        email for email in invited_emails if email not in active_user_emails
+    ]
+
+    return [InvitedUserSnapshot(email=email) for email in filtered_invited_emails]
 
 
-@router.get("/manage/users")
+@router.get("/manage/users", tags=PUBLIC_API_TAGS)
 def list_all_users(
     q: str | None = None,
     accepted_page: int | None = None,
@@ -229,6 +239,13 @@ def list_all_users(
     accepted_emails = {user.email for user in accepted_users}
     slack_users_emails = {user.email for user in slack_users}
     invited_emails = get_invited_users()
+
+    # Filter out users who are already active (either accepted or slack users)
+    all_active_emails = accepted_emails | slack_users_emails
+    invited_emails = [
+        email for email in invited_emails if email not in all_active_emails
+    ]
+
     if q:
         invited_emails = [
             email for email in invited_emails if re.search(r"{}".format(q), email, re.I)
@@ -339,7 +356,7 @@ def download_users_csv(
     )
 
 
-@router.put("/manage/admin/users")
+@router.put("/manage/admin/users", tags=PUBLIC_API_TAGS)
 def bulk_invite_users(
     emails: list[str] = Body(..., embed=True),
     current_user: User | None = Depends(current_admin_user),
@@ -359,7 +376,8 @@ def bulk_invite_users(
 
     try:
         for email in emails:
-            email_info = validate_email(email)
+            # Allow syntactically valid emails without DNS deliverability checks; tests use test domains
+            email_info = validate_email(email, check_deliverability=False)
             new_invited_emails.append(email_info.normalized)
 
     except (EmailUndeliverableError, EmailNotValidError) as e:
@@ -413,7 +431,7 @@ def bulk_invite_users(
         raise e
 
 
-@router.patch("/manage/admin/remove-invited-user")
+@router.patch("/manage/admin/remove-invited-user", tags=PUBLIC_API_TAGS)
 def remove_invited_user(
     user_email: UserByEmail,
     _: User | None = Depends(current_admin_user),
@@ -441,7 +459,7 @@ def remove_invited_user(
     return number_of_invited_users
 
 
-@router.patch("/manage/admin/deactivate-user")
+@router.patch("/manage/admin/deactivate-user", tags=PUBLIC_API_TAGS)
 def deactivate_user_api(
     user_email: UserByEmail,
     current_user: User | None = Depends(current_admin_user),
@@ -468,7 +486,7 @@ def deactivate_user_api(
     deactivate_user(user_to_deactivate, db_session)
 
 
-@router.delete("/manage/admin/delete-user")
+@router.delete("/manage/admin/delete-user", tags=PUBLIC_API_TAGS)
 async def delete_user(
     user_email: UserByEmail,
     _: User | None = Depends(current_admin_user),
@@ -505,7 +523,7 @@ async def delete_user(
         raise HTTPException(status_code=500, detail="Error deleting user")
 
 
-@router.patch("/manage/admin/activate-user")
+@router.patch("/manage/admin/activate-user", tags=PUBLIC_API_TAGS)
 def activate_user_api(
     user_email: UserByEmail,
     _: User | None = Depends(current_admin_user),
@@ -533,7 +551,7 @@ def get_valid_domains(
 """Endpoints for all"""
 
 
-@router.get("/users")
+@router.get("/users", tags=PUBLIC_API_TAGS)
 def list_all_users_basic_info(
     _: User | None = Depends(current_user),
     db_session: Session = Depends(get_session),
@@ -542,7 +560,7 @@ def list_all_users_basic_info(
     return [MinimalUserSnapshot(id=user.id, email=user.email) for user in users]
 
 
-@router.get("/get-user-role")
+@router.get("/get-user-role", tags=PUBLIC_API_TAGS)
 async def get_user_role(user: User = Depends(current_user)) -> UserRoleResponse:
     if user is None:
         raise ValueError("Invalid or missing user.")
@@ -605,7 +623,7 @@ def get_current_token_creation(
         return None
 
 
-@router.get("/me")
+@router.get("/me", tags=PUBLIC_API_TAGS)
 def verify_user_logged_in(
     request: Request,
     user: User | None = Depends(optional_user),
@@ -745,6 +763,25 @@ def update_user_auto_scroll_api(
             raise RuntimeError("This should never happen")
 
     update_user_auto_scroll(user.id, request.auto_scroll, db_session)
+
+
+@router.patch("/user/theme-preference")
+def update_user_theme_preference_api(
+    request: ThemePreferenceRequest,
+    user: User | None = Depends(current_user),
+    db_session: Session = Depends(get_session),
+) -> None:
+    if user is None:
+        if AUTH_TYPE == AuthType.DISABLED:
+            store = get_kv_store()
+            no_auth_user = fetch_no_auth_user(store)
+            no_auth_user.preferences.theme_preference = request.theme_preference
+            set_no_auth_user_preferences(store, no_auth_user.preferences)
+            return
+        else:
+            raise RuntimeError("This should never happen")
+
+    update_user_theme_preference(user.id, request.theme_preference, db_session)
 
 
 @router.patch("/user/default-model")

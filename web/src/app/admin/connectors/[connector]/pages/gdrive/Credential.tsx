@@ -3,14 +3,18 @@ import React, { useState, useEffect } from "react";
 import { useSWRConfig } from "swr";
 import * as Yup from "yup";
 import { useRouter } from "next/navigation";
+import type { Route } from "next";
 import { adminDeleteCredential } from "@/lib/credential";
 import { setupGoogleDriveOAuth } from "@/lib/googleDrive";
-import { GOOGLE_DRIVE_AUTH_IS_ADMIN_COOKIE_NAME } from "@/lib/constants";
+import {
+  DOCS_ADMINS_PATH,
+  GOOGLE_DRIVE_AUTH_IS_ADMIN_COOKIE_NAME,
+} from "@/lib/constants";
 import Cookies from "js-cookie";
 import { TextFormField, SectionHeader } from "@/components/Field";
 import { Form, Formik } from "formik";
 import { User } from "@/lib/types";
-import { Button } from "@/components/ui/button";
+import Button from "@/refresh-components/buttons/Button";
 import {
   Credential,
   GoogleDriveCredentialJson,
@@ -300,7 +304,7 @@ export const DriveJsonUploadSection = ({
         <a
           className="text-primary hover:text-primary/80 flex items-center gap-1 text-sm"
           target="_blank"
-          href="https://docs.onyx.app/admin/connectors/official/google_drive/overview"
+          href={`${DOCS_ADMINS_PATH}/connectors/official/google_drive/overview`}
           rel="noreferrer"
         >
           <FiLink className="h-3 w-3" />
@@ -340,8 +344,7 @@ export const DriveJsonUploadSection = ({
           {isAdmin && !existingAuthCredential && (
             <div className="mt-2">
               <Button
-                variant="destructive"
-                type="button"
+                danger
                 onClick={async () => {
                   const endpoint =
                     localServiceAccountData?.service_account_email
@@ -507,8 +510,7 @@ export const DriveAuthSection = ({
             </div>
           </div>
           <Button
-            variant="destructive"
-            type="button"
+            danger
             onClick={async () => {
               handleRevokeAccess(
                 connectorAssociated,
@@ -644,7 +646,7 @@ export const DriveAuthSection = ({
               });
 
               if (authUrl) {
-                router.push(authUrl);
+                router.push(authUrl as Route);
               } else {
                 setPopup({
                   message: errorMsg,

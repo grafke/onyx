@@ -63,6 +63,7 @@ export default function Truncated({
 
   const text = (
     <Text
+      as="p"
       className={cn("line-clamp-1 break-all text-left", className)}
       {...rest}
     >
@@ -73,36 +74,56 @@ export default function Truncated({
   const showTooltip = !disable && isTruncated;
 
   return (
-    <TooltipProvider>
-      <Tooltip>
-        <div
-          ref={visibleRef}
-          className="flex-grow overflow-hidden text-left w-full"
-        >
-          <TooltipTrigger asChild>
-            <div>{text}</div>
-          </TooltipTrigger>
-        </div>
+    <>
+      <TooltipProvider>
+        <Tooltip>
+          <div
+            ref={visibleRef}
+            className="flex-grow overflow-hidden text-left w-full"
+          >
+            <TooltipTrigger asChild>
+              <div>{text}</div>
+            </TooltipTrigger>
+          </div>
 
-        {/* Hide offscreen to measure full text width */}
-        <div
-          ref={hiddenRef}
-          className="fixed left-[-9999px] top-[0rem] whitespace-nowrap pointer-events-none opacity-0"
-          aria-hidden="true"
-        >
-          {text}
-        </div>
+          {showTooltip && (
+            <TooltipContent
+              side={side}
+              sideOffset={sideOffset}
+              className="max-w-[400px] break-words whitespace-normal"
+            >
+              {typeof children === "string" ? (
+                <Text as="p" textLight05>
+                  {children}
+                </Text>
+              ) : (
+                children
+              )}
+            </TooltipContent>
+          )}
+        </Tooltip>
+      </TooltipProvider>
 
-        {showTooltip && (
-          <TooltipContent side={side} sideOffset={sideOffset}>
-            {typeof children === "string" ? (
-              <Text inverted>{children}</Text>
-            ) : (
-              children
-            )}
-          </TooltipContent>
-        )}
-      </Tooltip>
-    </TooltipProvider>
+      {/*
+        Hide offscreen to measure full text width
+
+        # Note
+
+        The placement of this `div` *after* the above `TooltipProvider` is *VERY* important to our tests!
+        If the bottom `div` were placed first, any tests that try locating the string that the `Truncated` component is trying to render would find the bottom div first.
+        This can break expectations (since it's supposed to be hidden in the first place).
+
+        All in all, keep the below `div` *below* the above `TooltipProvider`.
+
+        - @raunakab
+      */}
+      <div
+        ref={hiddenRef}
+        className="fixed left-[-9999px] top-[0rem] whitespace-nowrap pointer-events-none opacity-0"
+        aria-hidden="true"
+      >
+        {text}
+      </div>
+    </>
   );
 }

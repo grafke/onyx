@@ -2,9 +2,10 @@
 
 import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import type { Route } from "next";
 import { CheckmarkIcon, TriangleAlertIcon } from "@/components/icons/icons";
 import CardSection from "@/components/admin/CardSection";
-import { Button } from "@/components/ui/button";
+import Button from "@/refresh-components/buttons/Button";
 
 interface OAuthCallbackConfig {
   // UI customization
@@ -69,7 +70,7 @@ export default function OAuthCallbackPage({ config }: OAuthCallbackPageProps) {
 
     const timer = setTimeout(() => {
       const target = redirectPath || config.defaultRedirectPath || "/chat";
-      router.push(target);
+      router.push(target as Route);
     }, delayMs);
 
     return () => {
@@ -257,9 +258,8 @@ export default function OAuthCallbackPage({ config }: OAuthCallbackPageProps) {
                     onClick={() => {
                       const target =
                         redirectPath || config.defaultRedirectPath || "/chat";
-                      router.push(target);
+                      router.push(target as Route);
                     }}
-                    variant="navigate"
                     className="w-full"
                   >
                     {config.backButtonText || "Back to Chat"}

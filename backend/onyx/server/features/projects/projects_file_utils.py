@@ -8,17 +8,21 @@ from pydantic import BaseModel
 from pydantic import ConfigDict
 from pydantic import Field
 
-from onyx.file_processing.extract_file_text import ACCEPTED_IMAGE_FILE_EXTENSIONS
-from onyx.file_processing.extract_file_text import ALL_ACCEPTED_FILE_EXTENSIONS
 from onyx.file_processing.extract_file_text import extract_file_text
 from onyx.file_processing.extract_file_text import get_file_ext
-from onyx.llm.factory import get_default_llms
+from onyx.file_processing.file_types import OnyxFileExtensions
+from onyx.file_processing.password_validation import is_file_password_protected
+from onyx.llm.factory import get_default_llm
 from onyx.natural_language_processing.utils import get_tokenizer
 from onyx.utils.logger import setup_logger
+from shared_configs.configs import MULTI_TENANT
+from shared_configs.configs import SKIP_USERFILE_THRESHOLD
+from shared_configs.configs import SKIP_USERFILE_THRESHOLD_TENANT_LIST
+from shared_configs.contextvars import get_current_tenant_id
 
 
 logger = setup_logger()
-FILE_TOKEN_COUNT_THRESHOLD = 50000
+FILE_TOKEN_COUNT_THRESHOLD = 100000
 UNKNOWN_FILENAME = "[unknown_file]"  # More descriptive than empty string
 
 
@@ -34,10 +38,14 @@ def get_safe_filename(upload: UploadFile) -> str:
 Image.MAX_IMAGE_PIXELS = 12000 * 12000
 
 
+class RejectedFile(BaseModel):
+    filename: str = Field(default="")
+    reason: str = Field(default="")
+
+
 class CategorizedFiles(BaseModel):
     acceptable: list[UploadFile] = Field(default_factory=list)
-    non_accepted: list[str] = Field(default_factory=list)
-    unsupported: list[str] = Field(default_factory=list)
+    rejected: list[RejectedFile] = Field(default_factory=list)
     acceptable_file_to_token_count: dict[str, int] = Field(default_factory=dict)
 
     # Allow FastAPI UploadFile instances
@@ -114,17 +122,36 @@ def categorize_uploaded_files(files: list[UploadFile]) -> CategorizedFiles:
 
     - Extracts text using extract_file_text for supported plain/document extensions.
     - Uses default tokenizer to compute token length.
-    - If token length > 50,000, marked as non_accepted.
-    - If extension unsupported or text cannot be extracted, marked as unsupported.
+    - If token length > 100,000, reject file (unless threshold skip is enabled).
+    - If extension unsupported or text cannot be extracted, reject file.
     - Otherwise marked as acceptable.
     """
 
     results = CategorizedFiles()
-    llm, _ = get_default_llms()
+    llm = get_default_llm()
 
     tokenizer = get_tokenizer(
         model_name=llm.config.model_name, provider_type=llm.config.model_provider
     )
+
+    # Check if threshold checks should be skipped
+    skip_threshold = False
+
+    # Check global skip flag (works for both single-tenant and multi-tenant)
+    if SKIP_USERFILE_THRESHOLD:
+        skip_threshold = True
+        logger.info("Skipping userfile threshold check (global setting)")
+    # Check tenant-specific skip list (only applicable in multi-tenant)
+    elif MULTI_TENANT and SKIP_USERFILE_THRESHOLD_TENANT_LIST:
+        try:
+            current_tenant_id = get_current_tenant_id()
+            skip_threshold = current_tenant_id in SKIP_USERFILE_THRESHOLD_TENANT_LIST
+            if skip_threshold:
+                logger.info(
+                    f"Skipping userfile threshold check for tenant: {current_tenant_id}"
+                )
+        except RuntimeError as e:
+            logger.warning(f"Failed to get current tenant ID: {str(e)}")
 
     for upload in files:
         try:
@@ -132,28 +159,48 @@ def categorize_uploaded_files(files: list[UploadFile]) -> CategorizedFiles:
             extension = get_file_ext(filename)
 
             # If image, estimate tokens via dedicated method first
-            if extension in ACCEPTED_IMAGE_FILE_EXTENSIONS:
+            if extension in OnyxFileExtensions.IMAGE_EXTENSIONS:
                 try:
                     token_count = estimate_image_tokens_for_upload(upload)
                 except (UnidentifiedImageError, OSError) as e:
                     logger.warning(
                         f"Failed to process image file '{filename}': {str(e)}"
                     )
-                    results.unsupported.append(filename)
+                    results.rejected.append(
+                        RejectedFile(
+                            filename=filename,
+                            reason=f"Unsupported file type: {extension}",
+                        )
+                    )
                     continue
 
-                if token_count > FILE_TOKEN_COUNT_THRESHOLD:
-                    results.non_accepted.append(filename)
+                if not skip_threshold and token_count > FILE_TOKEN_COUNT_THRESHOLD:
+                    results.rejected.append(
+                        RejectedFile(
+                            filename=filename,
+                            reason=f"Exceeds {FILE_TOKEN_COUNT_THRESHOLD} token limit",
+                        )
+                    )
                 else:
                     results.acceptable.append(upload)
                     results.acceptable_file_to_token_count[filename] = token_count
                 continue
 
             # Otherwise, handle as text/document: extract text and count tokens
-            if (
-                extension in ALL_ACCEPTED_FILE_EXTENSIONS
-                and extension not in ACCEPTED_IMAGE_FILE_EXTENSIONS
-            ):
+            elif extension in OnyxFileExtensions.ALL_ALLOWED_EXTENSIONS:
+                if is_file_password_protected(
+                    file=upload.file,
+                    file_name=filename,
+                    extension=extension,
+                ):
+                    logger.warning(f"{filename} is password protected")
+                    results.rejected.append(
+                        RejectedFile(
+                            filename=filename, reason="Document is password protected"
+                        )
+                    )
+                    continue
+
                 text_content = extract_file_text(
                     file=upload.file,
                     file_name=filename,
@@ -162,12 +209,19 @@ def categorize_uploaded_files(files: list[UploadFile]) -> CategorizedFiles:
                 )
                 if not text_content:
                     logger.warning(f"No text content extracted from '{filename}'")
-                    results.unsupported.append(filename)
+                    results.rejected.append(
+                        RejectedFile(filename=filename, reason="Could not read file")
+                    )
                     continue
 
                 token_count = len(tokenizer.encode(text_content))
-                if token_count > FILE_TOKEN_COUNT_THRESHOLD:
-                    results.non_accepted.append(filename)
+                if not skip_threshold and token_count > FILE_TOKEN_COUNT_THRESHOLD:
+                    results.rejected.append(
+                        RejectedFile(
+                            filename=filename,
+                            reason=f"Exceeds {FILE_TOKEN_COUNT_THRESHOLD} token limit",
+                        )
+                    )
                 else:
                     results.acceptable.append(upload)
                     results.acceptable_file_to_token_count[filename] = token_count
@@ -185,11 +239,20 @@ def categorize_uploaded_files(files: list[UploadFile]) -> CategorizedFiles:
             logger.warning(
                 f"Unsupported file extension '{extension}' for file '{filename}'"
             )
-            results.unsupported.append(filename)
+            results.rejected.append(
+                RejectedFile(
+                    filename=filename, reason=f"Unsupported file type: {extension}"
+                )
+            )
         except Exception as e:
             logger.warning(
                 f"Failed to process uploaded file '{get_safe_filename(upload)}' (error_type={type(e).__name__}, error={str(e)})"
             )
-            results.unsupported.append(get_safe_filename(upload))
+            results.rejected.append(
+                RejectedFile(
+                    filename=get_safe_filename(upload),
+                    reason="Failed to process upload",
+                )
+            )
 
     return results

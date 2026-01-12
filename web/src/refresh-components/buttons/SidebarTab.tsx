@@ -1,54 +1,33 @@
 "use client";
 
 import React from "react";
-import { SvgProps } from "@/icons";
+import type { IconProps } from "@opal/types";
 import { cn } from "@/lib/utils";
 import SimpleTooltip from "@/refresh-components/SimpleTooltip";
 import Link from "next/link";
+import type { Route } from "next";
 import Truncated from "@/refresh-components/texts/Truncated";
-
-const textClasses = (active: boolean | undefined) =>
-  ({
-    defaulted: [
-      active ? "text-text-04" : "text-text-03",
-      "group-hover/SidebarTab:text-text-04",
-    ],
-    lowlight: [
-      active ? "text-text-03" : "text-text-02",
-      "group-hover/SidebarTab:text-text-03",
-    ],
-  }) as const;
-
-const iconClasses = (active: boolean | undefined) =>
-  ({
-    defaulted: [
-      active ? "stroke-text-04" : "stroke-text-03",
-      "group-hover/SidebarTab:stroke-text-04",
-    ],
-    lowlight: [
-      active ? "stroke-text-03" : "stroke-text-02",
-      "group-hover/SidebarTab:stroke-text-03",
-    ],
-  }) as const;
 
 export interface SidebarTabProps {
   // Button states:
   folded?: boolean;
-  active?: boolean;
+  transient?: boolean;
+  focused?: boolean;
   lowlight?: boolean;
 
   // Button properties:
   onClick?: React.MouseEventHandler<HTMLDivElement>;
   href?: string;
   className?: string;
-  leftIcon?: React.FunctionComponent<SvgProps>;
+  leftIcon?: React.FunctionComponent<IconProps>;
   rightChildren?: React.ReactNode;
   children?: React.ReactNode;
 }
 
 export default function SidebarTab({
   folded,
-  active,
+  transient,
+  focused,
   lowlight,
 
   onClick,
@@ -58,39 +37,49 @@ export default function SidebarTab({
   rightChildren,
   children,
 }: SidebarTabProps) {
-  const variant = lowlight ? "lowlight" : "defaulted";
+  const variant = lowlight ? "lowlight" : focused ? "focused" : "defaulted";
+  const state = transient ? "active" : "inactive";
 
-  const innerContent = (
+  const content = (
     <div
+      data-state={state}
       className={cn(
-        "flex flex-row justify-center items-center p-spacing-interline-mini gap-spacing-inline rounded-08 cursor-pointer hover:bg-background-tint-03 group/SidebarTab w-full select-none",
-        active ? "bg-background-tint-00" : "bg-transparent",
+        "relative flex flex-row justify-start items-start p-1.5 gap-1 rounded-08 cursor-pointer group/SidebarTab w-full select-none",
+        `sidebar-tab-background-${variant}`,
         className
       )}
       onClick={onClick}
     >
+      {href && (
+        <Link
+          href={href as Route}
+          scroll={false}
+          className="absolute inset-0 rounded-08"
+          tabIndex={-1}
+        />
+      )}
       <div
+        data-state={state}
         className={cn(
-          "flex-1 h-[1.5rem] flex flex-row items-center px-spacing-inline py-spacing-inline-mini gap-spacing-interline",
-          folded ? "justify-center" : "justify-start"
+          "relative flex-1 h-[1.5rem] flex flex-row items-center px-1 py-0.5 gap-2 justify-start",
+          !focused && "pointer-events-none"
         )}
       >
         {LeftIcon && (
-          <div className="w-[1rem] h-[1rem] flex flex-col items-center justify-center">
+          <div className="w-[1rem] h-[1rem] flex items-center justify-center pointer-events-auto">
             <LeftIcon
-              className={cn(
-                "h-[1rem]",
-                "w-[1rem]",
-                iconClasses(active)[variant]
-              )}
+              data-state={state}
+              className={`h-[1rem] w-[1rem] sidebar-tab-icon-${variant}`}
             />
           </div>
         )}
         {!folded &&
           (typeof children === "string" ? (
             <Truncated
-              className={cn(textClasses(active)[variant])}
+              data-state={state}
+              className={`sidebar-tab-text-${variant}`}
               side="right"
+              sideOffset={40}
             >
               {children}
             </Truncated>
@@ -98,11 +87,13 @@ export default function SidebarTab({
             children
           ))}
       </div>
-      {!folded && rightChildren}
+      {!folded && (
+        <div className="relative h-[1.5rem] flex items-center">
+          {rightChildren}
+        </div>
+      )}
     </div>
   );
-
-  const content = href ? <Link href={href}>{innerContent}</Link> : innerContent;
 
   if (typeof children !== "string") return content;
   if (folded)

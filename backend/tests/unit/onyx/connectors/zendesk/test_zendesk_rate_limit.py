@@ -17,10 +17,10 @@ class _FakeTime:
     def __init__(self) -> None:
         self._t = 0.0
 
-    def monotonic(self) -> float:  # type: ignore[override]
+    def monotonic(self) -> float:
         return self._t
 
-    def sleep(self, seconds: float) -> None:  # type: ignore[override]
+    def sleep(self, seconds: float) -> None:
         # advance time without real waiting
         self._t += float(seconds)
 
@@ -39,7 +39,6 @@ class _FakeResponse:
         return None
 
 
-@pytest.mark.unit
 def test_zendesk_client_per_minute_rate_limiting(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

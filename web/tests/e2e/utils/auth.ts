@@ -1,9 +1,10 @@
-import { Page } from "@playwright/test";
+import type { Locator, Page } from "@playwright/test";
 import {
   TEST_ADMIN2_CREDENTIALS,
   TEST_ADMIN_CREDENTIALS,
   TEST_USER_CREDENTIALS,
 } from "../constants";
+import { logPageState } from "./pageStateLogger";
 
 // Basic function which logs in a user (either admin or regular user) to the application
 // It handles both successful login attempts and potential timeouts, with a retry mechanism
@@ -11,6 +12,14 @@ export async function loginAs(
   page: Page,
   userType: "admin" | "user" | "admin2"
 ) {
+  // Skip authentication if SKIP_AUTH environment variable is set
+  if (process.env.SKIP_AUTH === "true") {
+    console.log(
+      `[loginAs] Skipping authentication for ${userType} (SKIP_AUTH=true)`
+    );
+    return;
+  }
+
   const { email, password } =
     userType === "admin"
       ? TEST_ADMIN_CREDENTIALS
@@ -18,11 +27,32 @@ export async function loginAs(
         ? TEST_ADMIN2_CREDENTIALS
         : TEST_USER_CREDENTIALS;
 
-  console.log(`[loginAs] Navigating to /auth/login as ${userType}`);
-  await page.goto("http://localhost:3000/auth/login");
+  const waitForVisible = async (
+    locator: Locator,
+    debugContext: string,
+    timeoutMs = 30000
+  ) => {
+    try {
+      await locator.waitFor({ state: "visible", timeout: timeoutMs });
+    } catch (error) {
+      await logPageState(page, debugContext, "[login-debug]");
+      throw error;
+    }
+  };
 
-  await page.fill("#email", email);
-  await page.fill("#password", password);
+  const fillCredentials = async (contextLabel: string) => {
+    const emailInput = page.getByTestId("email");
+    const passwordInput = page.getByTestId("password");
+    await waitForVisible(emailInput, `${contextLabel}: email input`);
+    await waitForVisible(passwordInput, `${contextLabel}: password input`);
+    await emailInput.fill(email);
+    await passwordInput.fill(password);
+  };
+
+  console.log(`[loginAs] Navigating to /auth/login as ${userType}`);
+  await page.goto("/auth/login");
+
+  await fillCredentials("loginAs primary form");
 
   // Click the login button
   await page.click('button[type="submit"]');
@@ -34,29 +64,33 @@ export async function loginAs(
   });
 
   try {
-    await page.waitForURL("http://localhost:3000/chat", { timeout: 10000 });
+    await page.waitForURL("/chat", { timeout: 10000 });
     console.log(
       `[loginAs] Redirected to /chat for ${userType}. URL: ${page.url()}`
     );
-  } catch (error) {
+  } catch {
     console.log(`[loginAs] Timeout to /chat. Current URL: ${page.url()}`);
 
     // If redirect to /chat doesn't happen, go to /auth/login
     console.log(`[loginAs] Navigating to /auth/signup as fallback`);
-    await page.goto("http://localhost:3000/auth/signup");
+    await page.goto("/auth/signup");
+    await logPageState(
+      page,
+      `[loginAs] Landed on /auth/signup fallback (${userType})`,
+      "[login-debug]"
+    );
 
-    await page.fill("#email", email);
-    await page.fill("#password", password);
+    await fillCredentials("loginAs fallback form");
 
     // Click the login button
     await page.click('button[type="submit"]');
 
     try {
-      await page.waitForURL("http://localhost:3000/chat", { timeout: 10000 });
+      await page.waitForURL("/chat", { timeout: 10000 });
       console.log(
         `[loginAs] Fallback redirected to /chat for ${userType}. URL: ${page.url()}`
       );
-    } catch (error) {
+    } catch {
       console.log(
         `[loginAs] Fallback timeout again. Current URL: ${page.url()}`
       );
@@ -104,12 +138,21 @@ const generateRandomCredentials = () => {
 
 // Function to sign up a new random user
 export async function loginAsRandomUser(page: Page) {
+  // Skip authentication if SKIP_AUTH environment variable is set
+  if (process.env.SKIP_AUTH === "true") {
+    console.log("[loginAsRandomUser] Skipping authentication (SKIP_AUTH=true)");
+    return { email: "skipped@local.test", password: "skipped" };
+  }
+
   const { email, password } = generateRandomCredentials();
 
-  await page.goto("http://localhost:3000/auth/signup");
+  await page.goto("/auth/signup");
 
-  await page.fill("#email", email);
-  await page.fill("#password", password);
+  const emailInput = page.getByTestId("email");
+  const passwordInput = page.getByTestId("password");
+  await emailInput.waitFor({ state: "visible", timeout: 30000 });
+  await emailInput.fill(email);
+  await passwordInput.fill(password);
 
   // Click the signup button
   await page.click('button[type="submit"]');
@@ -119,10 +162,10 @@ export async function loginAsRandomUser(page: Page) {
     // Refresh the page to ensure everything is loaded properly
     // await page.reload();
 
-    await page.waitForURL("http://localhost:3000/chat?new_team=true");
+    await page.waitForURL("/chat?new_team=true");
     // Wait for the page to be fully loaded after refresh
     await page.waitForLoadState("networkidle");
-  } catch (error) {
+  } catch {
     console.log(`Timeout occurred. Current URL: ${page.url()}`);
     throw new Error("Failed to sign up and redirect to chat page");
   }
@@ -131,7 +174,7 @@ export async function loginAsRandomUser(page: Page) {
 }
 
 export async function inviteAdmin2AsAdmin1(page: Page) {
-  await page.goto("http://localhost:3000/admin/users");
+  await page.goto("/admin/users");
   // Wait for 400ms to ensure the page has loaded completely
   await page.waitForTimeout(400);
 
@@ -146,10 +189,10 @@ export async function inviteAdmin2AsAdmin1(page: Page) {
   try {
     // Wait for the dropdown trigger to be visible and click it
     await page
-      .getByTestId("user-role-dropdown-trigger-admin2_user@test.com")
+      .getByTestId("user-role-dropdown-trigger-admin2_user@example.com")
       .waitFor({ state: "visible", timeout: 5000 });
     await page
-      .getByTestId("user-role-dropdown-trigger-admin2_user@test.com")
+      .getByTestId("user-role-dropdown-trigger-admin2_user@example.com")
       .click();
 
     // Wait for the admin option to be visible
@@ -165,15 +208,35 @@ export async function inviteAdmin2AsAdmin1(page: Page) {
 
     // Verify that the change was successful (you may need to adjust this based on your UI)
     const newRole = await page
-      .getByTestId("user-role-dropdown-trigger-admin2_user@test.com")
+      .getByTestId("user-role-dropdown-trigger-admin2_user@example.com")
       .textContent();
     if (newRole?.toLowerCase().includes("admin")) {
       console.log("Successfully invited admin2 as admin");
     } else {
       throw new Error("Failed to update user role to admin");
     }
-  } catch (error) {
+  } catch (error: unknown) {
     console.error("Error inviting admin2 as admin:", error);
     throw error;
   }
+}
+
+export async function loginWithCredentials(
+  page: Page,
+  email: string,
+  password: string
+) {
+  if (process.env.SKIP_AUTH === "true") {
+    console.log("[loginWithCredentials] Skipping authentication");
+    return;
+  }
+
+  await page.goto("/auth/login");
+  const emailInput = page.getByTestId("email");
+  const passwordInput = page.getByTestId("password");
+  await emailInput.waitFor({ state: "visible", timeout: 30000 });
+  await emailInput.fill(email);
+  await passwordInput.fill(password);
+  await page.click('button[type="submit"]');
+  await page.waitForURL(/\/chat.*/, { timeout: 15000 });
 }

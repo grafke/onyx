@@ -1,10 +1,9 @@
-import React, { useCallback, useMemo } from "react";
+import React, { useCallback, useMemo, JSX } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
-import rehypePrism from "rehype-prism-plus";
+import rehypeHighlight from "rehype-highlight";
 import rehypeKatex from "rehype-katex";
-import "prismjs/themes/prism-tomorrow.css";
 import "katex/dist/katex.min.css";
 import "@/app/chat/message/custom-code-styles.css";
 import { FullChatState } from "@/app/chat/message/messageComponents/interfaces";
@@ -14,7 +13,7 @@ import {
 } from "@/app/chat/message/MemoizedTextComponents";
 import { extractCodeText, preprocessLaTeX } from "@/app/chat/message/codeUtils";
 import { CodeBlock } from "@/app/chat/message/CodeBlock";
-import { transformLinkUri } from "@/lib/utils";
+import { transformLinkUri, cn } from "@/lib/utils";
 
 /**
  * Processes content for markdown rendering by handling code blocks and LaTeX
@@ -64,29 +63,60 @@ export const useMarkdownComponents = (
         updatePresentingDocument={state?.setPresentingDocument || (() => {})}
         docs={state?.docs || []}
         userFiles={state?.userFiles || []}
+        citations={state?.citations}
         href={props.href}
       >
         {props.children}
       </MemoizedAnchor>
     ),
-    [state?.docs, state?.userFiles, state?.setPresentingDocument]
+    [
+      state?.docs,
+      state?.userFiles,
+      state?.citations,
+      state?.setPresentingDocument,
+    ]
   );
 
   const markdownComponents = useMemo(
     () => ({
       a: anchorCallback,
       p: paragraphCallback,
+      pre: ({ node, className, children }: any) => {
+        // Don't render the pre wrapper - CodeBlock handles its own wrapper
+        return <>{children}</>;
+      },
       b: ({ node, className, children }: any) => {
         return <span className={className}>{children}</span>;
       },
-      ul: ({ node, className, children }: any) => {
-        return <ul className={`text-text-05 ${className}`}>{children}</ul>;
+      ul: ({ node, className, children, ...props }: any) => {
+        return (
+          <ul className={className} {...props}>
+            {children}
+          </ul>
+        );
       },
-      ol: ({ node, className, children }: any) => {
-        return <ol className={`text-text-05 ${className}`}>{children}</ol>;
+      ol: ({ node, className, children, ...props }: any) => {
+        return (
+          <ol className={className} {...props}>
+            {children}
+          </ol>
+        );
       },
-      li: ({ node, className, children }: any) => {
-        return <li className={className}>{children}</li>;
+      li: ({ node, className, children, ...props }: any) => {
+        return (
+          <li className={className} {...props}>
+            {children}
+          </li>
+        );
+      },
+      table: ({ node, className, children, ...props }: any) => {
+        return (
+          <div className="markdown-table-breakout">
+            <table className={cn(className, "min-w-full")} {...props}>
+              {children}
+            </table>
+          </div>
+        );
       },
       code: ({ node, className, children }: any) => {
         const codeText = extractCodeText(node, processedContent, children);
@@ -119,9 +149,9 @@ export const renderMarkdown = (
         components={markdownComponents}
         remarkPlugins={[
           remarkGfm,
-          [remarkMath, { singleDollarTextMath: false }],
+          [remarkMath, { singleDollarTextMath: true }],
         ]}
-        rehypePlugins={[[rehypePrism, { ignoreMissing: true }], rehypeKatex]}
+        rehypePlugins={[rehypeHighlight, rehypeKatex]}
         urlTransform={transformLinkUri}
       >
         {content}

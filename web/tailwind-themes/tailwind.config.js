@@ -1,19 +1,14 @@
+const plugin = require("tailwindcss/plugin");
+
 /** @type {import('tailwindcss').Config} */
 
 module.exports = {
   darkMode: "class",
-  content: [
-    "./app/**/*.{js,ts,jsx,tsx,mdx}",
-    "./pages/**/*.{js,ts,jsx,tsx,mdx}",
-    "./components/**/*.{js,ts,jsx,tsx,mdx}",
-
-    // Or if using `src` directory:
-    "./src/**/*.{js,ts,jsx,tsx,mdx}",
-
-    // tremor
-    "./node_modules/@tremor/**/*.{js,ts,jsx,tsx}",
-  ],
+  content: ["./src/**/*.{js,jsx,ts,tsx}", "./lib/opal/**/*.{js,jsx,ts,tsx}"],
   theme: {
+    container: {
+      center: true,
+    },
     transparent: "transparent",
     current: "currentColor",
     extend: {
@@ -37,6 +32,14 @@ module.exports = {
           "0%": { opacity: "1", transform: "scale(1)" },
           "100%": { opacity: "0", transform: "scale(0.95)" },
         },
+        "collapsible-down": {
+          from: { height: "0" },
+          to: { height: "var(--radix-collapsible-content-height)" },
+        },
+        "collapsible-up": {
+          from: { height: "var(--radix-collapsible-content-height)" },
+          to: { height: "0" },
+        },
       },
       animation: {
         "fade-in-up": "fadeInUp 0.5s ease-out",
@@ -44,6 +47,8 @@ module.exports = {
         pulse: "pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite",
         "fade-in-scale": "fade-in-scale 0.2s ease-out forwards",
         "fade-out-scale": "fade-out-scale 0.2s ease-in forwards",
+        "collapsible-down": "collapsible-down 0.2s ease-out",
+        "collapsible-up": "collapsible-up 0.2s ease-out",
       },
       gradientColorStops: {
         "neutral-10": "var(--neutral-10) 5%",
@@ -100,6 +105,9 @@ module.exports = {
         "background-neutral-02": "var(--background-neutral-02)",
         "background-neutral-03": "var(--background-neutral-03)",
         "background-neutral-04": "var(--background-neutral-04)",
+        "background-neutral-light-00": "var(--background-neutral-light-00)",
+        "background-neutral-light-03": "var(--background-neutral-light-03)",
+        "background-neutral-dark-03": "var(--background-neutral-dark-03)",
         "background-neutral-inverted-04":
           "var(--background-neutral-inverted-04)",
         "background-neutral-inverted-03":
@@ -136,6 +144,7 @@ module.exports = {
         "action-link-03": "var(--action-link-03)",
         "action-link-02": "var(--action-link-02)",
         "action-link-01": "var(--action-link-01)",
+        "action-link-00": "var(--action-link-00)",
         "action-danger-06": "var(--action-danger-06)",
         "action-danger-05": "var(--action-danger-05)",
         "action-danger-04": "var(--action-danger-04)",
@@ -147,9 +156,48 @@ module.exports = {
         "highlight-match": "var(--highlight-match)",
         "highlight-selection": "var(--highlight-selection)",
         "highlight-active": "var(--highlight-active)",
+        "highlight-accent": "var(--highlight-accent)",
         "theme-primary-06": "var(--theme-primary-06)",
         "theme-primary-05": "var(--theme-primary-05)",
         "theme-primary-04": "var(--theme-primary-04)",
+        "theme-gradient-05": "var(--theme-gradient-05)",
+        "theme-gradient-00": "var(--theme-gradient-00)",
+        "theme-red-05": "var(--theme-red-05)",
+        "theme-red-04": "var(--theme-red-04)",
+        "theme-red-02": "var(--theme-red-02)",
+        "theme-red-01": "var(--theme-red-01)",
+        "theme-orange-05": "var(--theme-orange-05)",
+        "theme-orange-04": "var(--theme-orange-04)",
+        "theme-orange-02": "var(--theme-orange-02)",
+        "theme-orange-01": "var(--theme-orange-01)",
+        "theme-amber-05": "var(--theme-amber-05)",
+        "theme-amber-04": "var(--theme-amber-04)",
+        "theme-amber-02": "var(--theme-amber-02)",
+        "theme-amber-01": "var(--theme-amber-01)",
+        "theme-yellow-05": "var(--theme-yellow-05)",
+        "theme-yellow-02": "var(--theme-yellow-02)",
+        "theme-yellow-01": "var(--theme-yellow-01)",
+        "theme-green-05": "var(--theme-green-05)",
+        "theme-green-02": "var(--theme-green-02)",
+        "theme-green-01": "var(--theme-green-01)",
+        "theme-lime-05": "var(--theme-lime-05)",
+        "theme-lime-02": "var(--theme-lime-02)",
+        "theme-lime-01": "var(--theme-lime-01)",
+        "theme-cyan-05": "var(--theme-cyan-05)",
+        "theme-cyan-02": "var(--theme-cyan-02)",
+        "theme-cyan-01": "var(--theme-cyan-01)",
+        "theme-sky-05": "var(--theme-sky-05)",
+        "theme-sky-02": "var(--theme-sky-02)",
+        "theme-sky-01": "var(--theme-sky-01)",
+        "theme-blue-05": "var(--theme-blue-05)",
+        "theme-blue-02": "var(--theme-blue-02)",
+        "theme-blue-01": "var(--theme-blue-01)",
+        "theme-purple-05": "var(--theme-purple-05)",
+        "theme-purple-02": "var(--theme-purple-02)",
+        "theme-purple-01": "var(--theme-purple-01)",
+        "theme-magenta-05": "var(--theme-magenta-05)",
+        "theme-magenta-02": "var(--theme-magenta-02)",
+        "theme-magenta-01": "var(--theme-magenta-01)",
         "onyx-ink-100": "var(--onyx-ink-100)",
         "onyx-ink-95": "var(--onyx-ink-95)",
         "onyx-ink-90": "var(--onyx-ink-90)",
@@ -202,40 +250,15 @@ module.exports = {
         "code-number": "var(--code-number)",
         "code-definition": "var(--code-definition)",
 
+        // Shimmer colors for loading animations
+        "shimmer-base": "var(--shimmer-base)",
+        "shimmer-highlight": "var(--shimmer-highlight)",
+
         // Tailwind defaults
         background: "var(--background-tint-01)",
         foreground: "var(--background-tint-inverted-01)",
         border: "var(--border-01)",
         text: "var(--text-04)",
-
-        // (OLD) code styling
-        "code-bg": "#000",
-        "code-text": "var(--code-text)",
-        "token-comment": "var(--token-comment)",
-        "token-punctuation": "var(--token-punctuation)",
-        "token-property": "var(--token-property)",
-        "token-selector": "var(--token-selector)",
-        "token-atrule": "var(--token-atrule)",
-        "token-function": "var(--token-function)",
-        "token-regex": "var(--token-regex)",
-        "token-attr-name": "var(--token-attr-name)",
-        // "non-selectable": "var(--non-selectable)",
-      },
-      boxShadow: {
-        "01": "0px 2px 8px 0px var(--shadow-02)",
-
-        // light
-        "tremor-input": "0 1px 2px 0 rgb(0 0 0 / 0.05)",
-        "tremor-card":
-          "0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1)",
-        "tremor-dropdown":
-          "0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)",
-        // dark
-        "dark-tremor-input": "0 1px 2px 0 rgb(0 0 0 / 0.05)",
-        "dark-tremor-card":
-          "0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1)",
-        "dark-tremor-dropdown":
-          "0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)",
       },
       borderRadius: {
         "02": "var(--border-radius-02)",
@@ -248,10 +271,6 @@ module.exports = {
       fontSize: {
         "2xs": "0.625rem",
         "code-sm": "small",
-        "tremor-label": ["0.75rem"],
-        "tremor-default": ["0.875rem", { lineHeight: "1.25rem" }],
-        "tremor-title": ["1.125rem", { lineHeight: "1.75rem" }],
-        "tremor-metric": ["1.875rem", { lineHeight: "2.25rem" }],
       },
       fontWeight: {
         description: "375",
@@ -260,21 +279,10 @@ module.exports = {
       fontStyle: {
         "token-italic": "italic",
       },
-      spacing: {
-        "spacing-inline-mini": "var(--spacing-inline-mini)",
-        "spacing-inline": "var(--spacing-inline)",
-        "spacing-interline-mini": "var(--spacing-interline-mini)",
-        "spacing-interline": "var(--spacing-interline)",
-        "spacing-paragraph": "var(--spacing-paragraph)",
-        "spacing-headline": "var(--spacing-headline)",
-        "spacing-headline-large": "var(--spacing-headline-large)",
-        "spacing-block": "var(--spacing-block)",
-        "spacing-section": "var(--spacing-section)",
-        "padding-button": "var(--padding-button)",
-        "padding-content": "var(--padding-content)",
-        "padding-block-end": "var(--padding-block-end)",
-        "padding-body-main": "var(--padding-body-main)",
-        "padding-section": "var(--padding-section)",
+      backdropBlur: {
+        "01": "var(--backdrop-blur-01)",
+        "02": "var(--backdrop-blur-02)",
+        "03": "var(--backdrop-blur-03)",
       },
       calendar: {
         // Light mode
@@ -340,9 +348,16 @@ module.exports = {
         /^(fill-(?:slate|gray|zinc|neutral|stone|red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose)-(?:50|100|200|300|400|500|600|700|800|900|950))$/,
     },
   ],
+  // Note: @tailwindcss/container-queries plugin is not needed here.
+  // Container queries (@container, cqw units) are native in Tailwind v4+.
+  // After upgrading to Tailwind 4, this comment can be removed.
   plugins: [
     require("@tailwindcss/typography"),
     require("@headlessui/tailwindcss"),
     require("tailwindcss-animate"),
+    require("@tailwindcss/container-queries"),
+    plugin(({ addVariant }) => {
+      addVariant("focus-within-nonactive", "&:focus-within:not(:active)");
+    }),
   ],
 };

@@ -14,7 +14,7 @@ import {
 } from "@/components/ui/table";
 import Text from "@/components/ui/text";
 import Title from "@/components/ui/title";
-import { Button } from "@/components/ui/button";
+import Button from "@/refresh-components/buttons/Button";
 import useSWR from "swr";
 import React, { useState } from "react";
 import { UsageReport } from "./types";
@@ -23,17 +23,13 @@ import Link from "next/link";
 import { humanReadableFormat, humanReadableFormatWithTime } from "@/lib/time";
 import { ErrorCallout } from "@/components/ErrorCallout";
 import { PageSelector } from "@/components/PageSelector";
-import { Separator } from "@/components/ui/separator";
+import Separator from "@/refresh-components/Separator";
 import { DateRangePickerValue } from "../../../../../components/dateRangeSelectors/AdminDateRangeSelector";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
-import { CalendarIcon } from "lucide-react";
-import { Calendar } from "@/components/ui/calendar";
+import Popover from "@/refresh-components/Popover";
+import Calendar from "@/refresh-components/Calendar";
 import { cn } from "@/lib/utils";
 import { Spinner } from "@/components/Spinner";
+import { SvgCalendar } from "@opal/icons";
 
 function GenerateReportInput({
   onReportGenerated,
@@ -105,15 +101,15 @@ function GenerateReportInput({
       </Text>
       <div className="grid gap-2 mb-3">
         <Popover>
-          <PopoverTrigger asChild>
+          <Popover.Trigger asChild>
             <Button
-              variant="outline"
+              secondary
               className={cn(
                 "w-[300px] justify-start text-left font-normal",
                 !dateRange && "text-muted-foreground"
               )}
+              leftIcon={SvgCalendar}
             >
-              <CalendarIcon className="mr-2 h-4 w-4" />
               {dateRange?.from ? (
                 dateRange.to ? (
                   <>
@@ -127,8 +123,8 @@ function GenerateReportInput({
                 <span>Pick a date range</span>
               )}
             </Button>
-          </PopoverTrigger>
-          <PopoverContent className="w-auto p-0" align="start">
+          </Popover.Trigger>
+          <Popover.Content align="start">
             <Calendar
               initialFocus
               mode="range"
@@ -147,7 +143,7 @@ function GenerateReportInput({
             />
             <div className="border-t p-3">
               <Button
-                variant="ghost"
+                tertiary
                 className="w-full justify-start"
                 onClick={() => {
                   setDateRange({
@@ -160,7 +156,7 @@ function GenerateReportInput({
                 Last 7 days
               </Button>
               <Button
-                variant="ghost"
+                tertiary
                 className="w-full justify-start"
                 onClick={() => {
                   setDateRange({
@@ -173,7 +169,7 @@ function GenerateReportInput({
                 Last 30 days
               </Button>
               <Button
-                variant="ghost"
+                tertiary
                 className="w-full justify-start"
                 onClick={() => {
                   setDateRange({
@@ -186,7 +182,7 @@ function GenerateReportInput({
                 Last year
               </Button>
               <Button
-                variant="ghost"
+                tertiary
                 className="w-full justify-start"
                 onClick={() => {
                   setDateRange({
@@ -199,13 +195,12 @@ function GenerateReportInput({
                 All time
               </Button>
             </div>
-          </PopoverContent>
+          </Popover.Content>
         </Popover>
       </div>
       <Button
         color={"blue"}
-        icon={FiDownloadCloud}
-        size="sm"
+        leftIcon={FiDownloadCloud}
         disabled={isLoading || isWaitingForReport}
         onClick={() => requestReport()}
       >
@@ -407,7 +402,7 @@ export default function UsageReports() {
   return (
     <>
       {isWaitingForReport && <Spinner />}
-      <div className="mx-auto container">
+      <>
         <GenerateReportInput
           onReportGenerated={handleReportGenerated}
           isWaitingForReport={isWaitingForReport}
@@ -447,7 +442,7 @@ export default function UsageReports() {
           isWaitingForReport={isWaitingForReport}
           onNewReportDetected={handleNewReportDetected}
         />
-      </div>
+      </>
     </>
   );
 }

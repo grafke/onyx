@@ -1,3 +1,5 @@
+"use client";
+
 import {
   type User,
   UserRole,
@@ -22,43 +24,24 @@ import usePaginatedFetch from "@/hooks/usePaginatedFetch";
 import { ThreeDotsLoader } from "@/components/Loading";
 import { ErrorCallout } from "@/components/ErrorCallout";
 import { InviteUserButton } from "./buttons/InviteUserButton";
+import InputSelect from "@/refresh-components/inputs/InputSelect";
 import {
   Select,
   SelectContent,
-  SelectItem,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Button } from "@/components/ui/button";
+import Button from "@/refresh-components/buttons/Button";
 import { useUser } from "@/components/user/UserProvider";
 import { LeaveOrganizationButton } from "./buttons/LeaveOrganizationButton";
 import { NEXT_PUBLIC_CLOUD_ENABLED } from "@/lib/constants";
 import ResetPasswordModal from "./ResetPasswordModal";
-import {
-  MoreHorizontal,
-  LogOut,
-  UserMinus,
-  UserX,
-  KeyRound,
-} from "lucide-react";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
-
+import { LogOut, UserMinus } from "lucide-react";
+import Popover from "@/refresh-components/Popover";
+import IconButton from "@/refresh-components/buttons/IconButton";
+import { SvgKey, SvgMoreHorizontal } from "@opal/icons";
 const ITEMS_PER_PAGE = 10;
 const PAGES_PER_BATCH = 2;
-
-interface Props {
-  invitedUsers: InvitedUserSnapshot[];
-  setPopup: (spec: PopupSpec) => void;
-  q: string;
-  invitedUsersMutate: () => void;
-  countDisplay?: ReactNode;
-  onTotalItemsChange?: (count: number) => void;
-  onLoadingChange?: (isLoading: boolean) => void;
-}
 
 interface ActionMenuProps {
   user: User;
@@ -69,7 +52,17 @@ interface ActionMenuProps {
   handleResetPassword: (user: User) => void;
 }
 
-const SignedUpUserTable = ({
+export interface SignedUpUserTableProps {
+  invitedUsers: InvitedUserSnapshot[];
+  setPopup: (spec: PopupSpec) => void;
+  q: string;
+  invitedUsersMutate: () => void;
+  countDisplay?: ReactNode;
+  onTotalItemsChange?: (count: number) => void;
+  onLoadingChange?: (isLoading: boolean) => void;
+}
+
+export default function SignedUpUserTable({
   invitedUsers,
   setPopup,
   q = "",
@@ -77,7 +70,7 @@ const SignedUpUserTable = ({
   countDisplay,
   onTotalItemsChange,
   onLoadingChange,
-}: Props) => {
+}: SignedUpUserTableProps) {
   const [filters, setFilters] = useState<{
     is_active?: boolean;
     roles?: UserRole[];
@@ -85,6 +78,7 @@ const SignedUpUserTable = ({
 
   const [selectedRoles, setSelectedRoles] = useState<UserRole[]>([]);
   const [resetPasswordUser, setResetPasswordUser] = useState<User | null>(null);
+  const invitedEmails = invitedUsers.map((user) => user.email.toLowerCase());
 
   const {
     currentPageData: pageOfUsers,
@@ -166,7 +160,7 @@ const SignedUpUserTable = ({
     <>
       <div className="flex flex-wrap items-center justify-between gap-4 py-4">
         <div className="flex flex-wrap items-center gap-4">
-          <Select
+          <InputSelect
             value={filters.is_active?.toString() || "all"}
             onValueChange={(selectedStatus) =>
               setFilters((prev) => {
@@ -181,15 +175,15 @@ const SignedUpUserTable = ({
               })
             }
           >
-            <SelectTrigger className="w-[260px] h-[34px] bg-neutral">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent className="bg-background-tint-00">
-              <SelectItem value="all">All Status</SelectItem>
-              <SelectItem value="true">Active</SelectItem>
-              <SelectItem value="false">Inactive</SelectItem>
-            </SelectContent>
-          </Select>
+            <InputSelect.Trigger />
+
+            <InputSelect.Content>
+              <InputSelect.Item value="all">All Status</InputSelect.Item>
+              <InputSelect.Item value="true">Active</InputSelect.Item>
+              <InputSelect.Item value="false">Inactive</InputSelect.Item>
+            </InputSelect.Content>
+          </InputSelect>
+
           <Select value="roles">
             <SelectTrigger className="w-[260px] h-[34px] bg-neutral">
               <SelectValue>
@@ -259,18 +253,15 @@ const SignedUpUserTable = ({
     invitedUsersMutate,
     handleResetPassword,
   }) => {
-    const buttonClassName = "w-full justify-start";
+    const buttonClassName = "w-full";
 
     return (
       <Popover>
-        <PopoverTrigger asChild>
-          <Button variant="ghost" className="h-8 w-8 p-0">
-            <span className="sr-only">Open menu</span>
-            <MoreHorizontal className="h-4 w-4" />
-          </Button>
-        </PopoverTrigger>
-        <PopoverContent className="w-48">
-          <div className="grid gap-2">
+        <Popover.Trigger asChild>
+          <IconButton secondary icon={SvgMoreHorizontal} />
+        </Popover.Trigger>
+        <Popover.Content>
+          <div className="grid gap-1">
             {NEXT_PUBLIC_CLOUD_ENABLED && user.id === currentUser?.id ? (
               <LeaveOrganizationButton
                 user={user}
@@ -301,23 +292,22 @@ const SignedUpUserTable = ({
                   mutate={refresh}
                   className={buttonClassName}
                 >
-                  <UserX className="mr-2 h-4 w-4" />
-                  <span>{user.is_active ? "Deactivate" : "Activate"} User</span>
+                  {/*<UserX className="mr-2 h-4 w-4" />*/}
+                  {user.is_active ? "Deactivate User" : "Activate User"}
                 </DeactivateUserButton>
               </>
             )}
             {user.password_configured && (
               <Button
-                variant="ghost"
                 className={buttonClassName}
                 onClick={() => handleResetPassword(user)}
+                leftIcon={SvgKey}
               >
-                <KeyRound className="mr-2 h-4 w-4" />
-                <span>Reset Password</span>
+                Reset Password
               </Button>
             )}
           </div>
-        </PopoverContent>
+        </Popover.Content>
       </Popover>
     );
   };
@@ -327,7 +317,7 @@ const SignedUpUserTable = ({
       return (
         <InviteUserButton
           user={user}
-          invited={invitedUsers.map((u) => u.email).includes(user.email)}
+          invited={invitedEmails.includes(user.email.toLowerCase())}
           setPopup={setPopup}
           mutate={[refresh, invitedUsersMutate]}
         />
@@ -416,6 +406,4 @@ const SignedUpUserTable = ({
       )}
     </>
   );
-};
-
-export default SignedUpUserTable;
+}

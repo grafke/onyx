@@ -42,6 +42,7 @@ import { SEARCH_PARAM_NAMES } from "@/app/chat/services/searchParams";
 import { useAppRouter } from "@/hooks/appNavigation";
 import { ChatFileType } from "../interfaces";
 import { PopupSpec } from "@/components/admin/connectors/Popup";
+import { useProjects } from "@/lib/hooks/useProjects";
 
 export type { Project, ProjectFile } from "./projectsService";
 
@@ -98,6 +99,7 @@ interface ProjectsContextType {
   ) => Promise<ProjectFile[]>;
   allRecentFiles: ProjectFile[];
   allCurrentProjectFiles: ProjectFile[];
+  isLoadingProjectDetails: boolean;
   setCurrentMessageFiles: Dispatch<SetStateAction<ProjectFile[]>>;
   upsertInstructions: (instructions: string) => Promise<void>;
   fetchProjects: () => Promise<Project[]>;
@@ -125,14 +127,13 @@ const ProjectsContext = createContext<ProjectsContextType | undefined>(
 
 interface ProjectsProviderProps {
   children: ReactNode;
-  initialProjects?: Project[];
 }
 
 export const ProjectsProvider: React.FC<ProjectsProviderProps> = ({
   children,
-  initialProjects = [],
 }) => {
-  const [projects, setProjects] = useState<Project[]>(initialProjects);
+  // Use SWR hook for projects list - no more SSR initial data
+  const { projects, refreshProjects } = useProjects();
   const [recentFiles, setRecentFiles] = useState<ProjectFile[]>([]);
   const [currentProjectDetails, setCurrentProjectDetails] =
     useState<ProjectDetails | null>(null);
@@ -154,35 +155,39 @@ export const ProjectsProvider: React.FC<ProjectsProviderProps> = ({
   const [allCurrentProjectFiles, setAllCurrentProjectFiles] = useState<
     ProjectFile[]
   >([]);
+  const [isLoadingProjectDetails, setIsLoadingProjectDetails] = useState(false);
   const projectToUploadFilesMapRef = useRef<Map<number, ProjectFile[]>>(
     new Map()
   );
   const route = useAppRouter();
 
+  // Use SWR's mutate to refresh projects - returns the new data
   const fetchProjects = useCallback(async (): Promise<Project[]> => {
     try {
-      const data: Project[] = await svcFetchProjects();
-      setProjects(data);
-      return data;
+      const result = await refreshProjects();
+      return result ?? [];
     } catch (err) {
-      const message =
-        err instanceof Error ? err.message : "Failed to fetch projects";
       return [];
     }
-  }, []);
+  }, [refreshProjects]);
 
   // Load full details for current project
   const refreshCurrentProjectDetails = useCallback(async () => {
     if (currentProjectId) {
-      const details = await svcGetProjectDetails(currentProjectId);
-      await fetchProjects();
-      setCurrentProjectDetails(details);
-      setAllCurrentProjectFiles(details.files || []);
-      if (projectToUploadFilesMapRef.current.has(currentProjectId)) {
-        setAllCurrentProjectFiles((prev) => [
-          ...prev,
-          ...(projectToUploadFilesMapRef.current.get(currentProjectId) || []),
-        ]);
+      setIsLoadingProjectDetails(true);
+      try {
+        const details = await svcGetProjectDetails(currentProjectId);
+        await fetchProjects();
+        setCurrentProjectDetails(details);
+        setAllCurrentProjectFiles(details.files || []);
+        if (projectToUploadFilesMapRef.current.has(currentProjectId)) {
+          setAllCurrentProjectFiles((prev) => [
+            ...prev,
+            ...(projectToUploadFilesMapRef.current.get(currentProjectId) || []),
+          ]);
+        }
+      } finally {
+        setIsLoadingProjectDetails(false);
       }
     }
   }, [
@@ -223,14 +228,27 @@ export const ProjectsProvider: React.FC<ProjectsProviderProps> = ({
 
   const renameProject = useCallback(
     async (projectId: number, name: string): Promise<Project> => {
+      // Optimistically update project details UI if this is the current project
+      if (currentProjectId === projectId) {
+        setCurrentProjectDetails((prev) =>
+          prev ? { ...prev, project: { ...prev.project, name } } : prev
+        );
+      }
+
       try {
         const updated = await svcRenameProject(projectId, name);
+        // Refresh to get canonical state from server (SWR handles projects list)
         await fetchProjects();
         if (currentProjectId === projectId) {
           await refreshCurrentProjectDetails();
         }
         return updated;
       } catch (err) {
+        // Refresh to restore on failure
+        await fetchProjects();
+        if (currentProjectId === projectId) {
+          await refreshCurrentProjectDetails();
+        }
         const message =
           err instanceof Error ? err.message : "Failed to rename project";
         throw err;
@@ -283,6 +301,36 @@ export const ProjectsProvider: React.FC<ProjectsProviderProps> = ({
     }
     return tempIdMap;
   };
+
+  const removeOptimisticFilesByTempIds = useCallback(
+    (optimisticTempIds: Set<string>, projectId?: number | null) => {
+      // Remove from recent optimistic list
+      setAllRecentFiles((prev) =>
+        prev.filter((f) => !f.temp_id || !optimisticTempIds.has(f.temp_id))
+      );
+
+      // Remove from current message files if present
+      setCurrentMessageFiles((prev) =>
+        prev.filter((f) => !f.temp_id || !optimisticTempIds.has(f.temp_id))
+      );
+
+      // Remove from project optimistic list
+      if (projectId) {
+        setAllCurrentProjectFiles((prev) =>
+          prev.filter((f) => !f.temp_id || !optimisticTempIds.has(f.temp_id))
+        );
+
+        // Clear the tracked optimistic files for this project
+        let projectIdToFiles: ProjectFile[] =
+          projectToUploadFilesMapRef.current.get(projectId) || [];
+        projectIdToFiles = projectIdToFiles.filter(
+          (f: ProjectFile) => !f.temp_id || !optimisticTempIds.has(f.temp_id)
+        );
+        projectToUploadFilesMapRef.current.set(projectId, projectIdToFiles);
+      }
+    },
+    [projectToUploadFilesMapRef]
+  );
 
   const beginUpload = useCallback(
     async (
@@ -338,16 +386,14 @@ export const ProjectsProvider: React.FC<ProjectsProviderProps> = ({
             );
             projectToUploadFilesMapRef.current.set(projectId, []);
           }
-          const unsupported = uploaded.unsupported_files || [];
-          const nonAccepted = uploaded.non_accepted_files || [];
-          if (unsupported.length > 0 || nonAccepted.length > 0) {
-            const detailsParts: string[] = [];
-            if (unsupported.length > 0) {
-              detailsParts.push(`Unsupported: ${unsupported.join(", ")}`);
-            }
-            if (nonAccepted.length > 0) {
-              detailsParts.push(`Not accepted: ${nonAccepted.join(", ")}`);
-            }
+          const rejected_files = uploaded.rejected_files || [];
+
+          if (rejected_files.length > 0) {
+            const uniqueReasons = new Set(
+              rejected_files.map((rejected_file) => rejected_file.reason)
+            );
+            const detailsParts = Array.from(uniqueReasons);
+
             setPopup?.({
               type: "warning",
               message: `Some files were not uploaded. ${detailsParts.join(
@@ -355,10 +401,9 @@ export const ProjectsProvider: React.FC<ProjectsProviderProps> = ({
               )}`,
             });
 
-            const failedNameSet = new Set<string>([
-              ...unsupported,
-              ...nonAccepted,
-            ]);
+            const failedNameSet = new Set<string>(
+              rejected_files.map((file) => file.file_name)
+            );
             const failedTempIds = Array.from(
               new Set(
                 optimisticFiles
@@ -366,6 +411,7 @@ export const ProjectsProvider: React.FC<ProjectsProviderProps> = ({
                   .map((f) => f.temp_id as string)
               )
             );
+            removeOptimisticFilesByTempIds(new Set(failedTempIds), projectId);
             if (failedTempIds.length > 0) {
               onFailure?.(failedTempIds);
             }
@@ -387,26 +433,7 @@ export const ProjectsProvider: React.FC<ProjectsProviderProps> = ({
               .filter((id): id is string => Boolean(id))
           );
 
-          // Remove from recent optimistic list
-          setAllRecentFiles((prev) =>
-            prev.filter((f) => !f.temp_id || !optimisticTempIds.has(f.temp_id))
-          );
-
-          // Remove from current message files if present
-          setCurrentMessageFiles((prev) =>
-            prev.filter((f) => !f.temp_id || !optimisticTempIds.has(f.temp_id))
-          );
-
-          // Remove from project optimistic list
-          if (projectId) {
-            setAllCurrentProjectFiles((prev) =>
-              prev.filter(
-                (f) => !f.temp_id || !optimisticTempIds.has(f.temp_id)
-              )
-            );
-            // Clear the tracked optimistic files for this project
-            projectToUploadFilesMapRef.current.delete(projectId);
-          }
+          removeOptimisticFilesByTempIds(optimisticTempIds, projectId);
 
           setPopup?.({
             type: "error",
@@ -423,7 +450,12 @@ export const ProjectsProvider: React.FC<ProjectsProviderProps> = ({
         });
       return optimisticFiles;
     },
-    [currentProjectId, refreshCurrentProjectDetails, refreshRecentFiles]
+    [
+      currentProjectId,
+      refreshCurrentProjectDetails,
+      refreshRecentFiles,
+      removeOptimisticFilesByTempIds,
+    ]
   );
 
   const uploadFiles = useCallback(
@@ -489,6 +521,12 @@ export const ProjectsProvider: React.FC<ProjectsProviderProps> = ({
       })
     );
   }, [recentFiles]);
+
+  // Clear project details when switching projects to show skeleton
+  useEffect(() => {
+    setCurrentProjectDetails(null);
+    setAllCurrentProjectFiles([]);
+  }, [currentProjectId]);
 
   useEffect(() => {
     if (currentProjectId) {
@@ -655,6 +693,7 @@ export const ProjectsProvider: React.FC<ProjectsProviderProps> = ({
       currentMessageFiles,
       allRecentFiles,
       allCurrentProjectFiles,
+      isLoadingProjectDetails,
       beginUpload,
       setCurrentMessageFiles,
       upsertInstructions,
@@ -727,6 +766,7 @@ export const ProjectsProvider: React.FC<ProjectsProviderProps> = ({
       currentMessageFiles,
       allRecentFiles,
       allCurrentProjectFiles,
+      isLoadingProjectDetails,
       beginUpload,
       setCurrentMessageFiles,
       upsertInstructions,

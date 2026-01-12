@@ -10,7 +10,7 @@ const getVariantClasses = (active?: boolean) => [
   "hover:bg-background-tint-02",
 ];
 
-interface TagProps {
+export interface TagProps {
   // Tag states:
   active?: boolean;
 
@@ -36,18 +36,18 @@ export default function Tag({
     <button
       type="button"
       className={cn(
-        "p-spacing-interline-mini rounded-08 group w-fit flex items-center gap-spacing-inline transition-all duration-200 ease-in-out",
+        "p-1.5 rounded-08 group w-fit flex items-center gap-1 transition-all duration-200 ease-in-out",
         getVariantClasses(active),
         className
       )}
       onClick={onClick}
     >
       {/* Icons container */}
-      <div className="flex items-center -space-x-spacing-inline">
+      <div className="flex items-center -space-x-1">
         {visibleIcons.map((Icon, index) => (
           <div
             key={index}
-            className="relative bg-background-tint-00 border border-background-tint-01 p-spacing-inline-mini rounded-04"
+            className="relative bg-background-tint-00 border border-background-tint-01 p-0.5 rounded-04"
             style={{ zIndex: visibleIcons.length - index }}
           >
             <Icon className="w-[0.6rem] h-[0.6rem] stroke-text-04" />
@@ -56,15 +56,15 @@ export default function Tag({
       </div>
 
       {/* Count display - only shows on hover/active */}
-      <div
+      <Text
         className={cn(
-          "transition-all duration-200 ease-in-out overflow-hidden",
+          "inline-flex transition-all duration-200 ease-in-out overflow-hidden",
           "group-hover:max-w-8 group-hover:opacity-100",
           active ? "max-w-[10rem] opacity-100" : "max-w-0 opacity-0"
         )}
       >
-        <Text>{children.length}</Text>
-      </div>
+        {children.length}
+      </Text>
 
       <Text>{label}</Text>
     </button>

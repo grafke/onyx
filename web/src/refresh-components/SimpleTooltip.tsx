@@ -11,13 +11,17 @@ import Text from "@/refresh-components/texts/Text";
 
 export interface SimpleTooltipProps
   extends React.ComponentPropsWithoutRef<typeof TooltipContent> {
+  disabled?: boolean;
   tooltip?: string;
   children?: React.ReactNode;
 }
 
 export default function SimpleTooltip({
+  disabled = false,
   tooltip,
+  className,
   children,
+  side = "right",
   ...rest
 }: SimpleTooltipProps) {
   // Determine hover content based on the logic:
@@ -30,15 +34,30 @@ export default function SimpleTooltip({
   // If no hover content, just render children without tooltip
   if (!hoverContent) return <>{children}</>;
 
+  // TooltipTrigger `asChild` expects a ref-aware DOM element; wrap anything
+  // else in a span so non-forwardRef components and fragments don't crash.
+  const isDomElement =
+    React.isValidElement(children) && typeof children.type === "string";
+
+  const triggerChild = isDomElement ? children : <span>{children}</span>;
+
   return (
     <TooltipProvider>
       <Tooltip>
-        <TooltipTrigger asChild>
-          <div>{children}</div>
+        <TooltipTrigger
+          asChild
+          // Doesn't work for some reason.
+          // disabled={disabled}
+        >
+          {triggerChild}
         </TooltipTrigger>
-        <TooltipContent side="right" {...rest}>
-          <Text inverted>{hoverContent}</Text>
-        </TooltipContent>
+        {!disabled && (
+          <TooltipContent side={side} className={className} {...rest}>
+            <Text as="p" textLight05>
+              {hoverContent}
+            </Text>
+          </TooltipContent>
+        )}
       </Tooltip>
     </TooltipProvider>
   );

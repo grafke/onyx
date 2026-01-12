@@ -6,6 +6,7 @@ import React, {
   useEffect,
 } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import type { Route } from "next";
 import { ValidSources } from "@/lib/types";
 
 interface FormContextType {
@@ -25,6 +26,7 @@ interface FormContextType {
 
 const FormContext = createContext<FormContextType | undefined>(undefined);
 
+// TODO: deprecate this
 export const FormProvider: React.FC<{
   children: ReactNode;
   connector: ValidSources;
@@ -34,8 +36,8 @@ export const FormProvider: React.FC<{
   const pathname = usePathname();
 
   // Initialize formStep based on the URL parameter
-  const initialStep = parseInt(searchParams?.get("step") || "0", 10);
-  const [formStep, setFormStep] = useState(initialStep);
+  const formStepFromUrlParams = parseInt(searchParams?.get("step") || "0", 10);
+  const [formStep, setFormStep] = useState(formStepFromUrlParams);
   const [formValues, setFormValues] = useState<Record<string, any>>({});
 
   const [allowAdvanced, setAllowAdvanced] = useState(false);
@@ -59,23 +61,21 @@ export const FormProvider: React.FC<{
     const updatedSearchParams = new URLSearchParams(
       searchParams?.toString() || ""
     );
-    const existingStep = updatedSearchParams?.get("step");
     updatedSearchParams.set("step", formStep.toString());
     const newUrl = `${pathname}?${updatedSearchParams.toString()}`;
 
-    if (!existingStep) {
-      router.replace(newUrl);
+    if (!formStepFromUrlParams) {
+      router.replace(newUrl as Route);
     } else if (newUrl !== pathname) {
-      router.push(newUrl);
+      router.push(newUrl as Route);
     }
-  }, [formStep, router, pathname, searchParams]);
+  }, [formStep, router, pathname, formStepFromUrlParams]);
 
   useEffect(() => {
-    const stepFromUrl = parseInt(searchParams?.get("step") || "0", 10);
-    if (stepFromUrl !== formStep) {
-      setFormStep(stepFromUrl);
+    if (formStepFromUrlParams !== formStep) {
+      setFormStep(formStepFromUrlParams);
     }
-  }, [searchParams]);
+  }, [formStepFromUrlParams]);
 
   const contextValue: FormContextType = {
     formStep,

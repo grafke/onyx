@@ -1,6 +1,7 @@
 import logging
 import sys
 import traceback
+import warnings
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from typing import Any
@@ -37,7 +38,6 @@ from onyx.configs.app_configs import APP_HOST
 from onyx.configs.app_configs import APP_PORT
 from onyx.configs.app_configs import AUTH_RATE_LIMITING_ENABLED
 from onyx.configs.app_configs import AUTH_TYPE
-from onyx.configs.app_configs import DISABLE_GENERATIVE_AI
 from onyx.configs.app_configs import LOG_ENDPOINT_LATENCY
 from onyx.configs.app_configs import OAUTH_CLIENT_ID
 from onyx.configs.app_configs import OAUTH_CLIENT_SECRET
@@ -76,14 +76,21 @@ from onyx.server.features.input_prompt.api import (
 from onyx.server.features.mcp.api import admin_router as mcp_admin_router
 from onyx.server.features.mcp.api import router as mcp_router
 from onyx.server.features.notifications.api import router as notification_router
+from onyx.server.features.oauth_config.api import (
+    admin_router as admin_oauth_config_router,
+)
+from onyx.server.features.oauth_config.api import router as oauth_config_router
 from onyx.server.features.password.api import router as password_router
+from onyx.server.features.persona.api import admin_agents_router
 from onyx.server.features.persona.api import admin_router as admin_persona_router
+from onyx.server.features.persona.api import agents_router
 from onyx.server.features.persona.api import basic_router as persona_router
 from onyx.server.features.projects.api import router as projects_router
 from onyx.server.features.tool.api import admin_router as admin_tool_router
 from onyx.server.features.tool.api import router as tool_router
+from onyx.server.features.user_oauth_token.api import router as user_oauth_token_router
+from onyx.server.features.web_search.api import router as web_search_router
 from onyx.server.federated.api import router as federated_router
-from onyx.server.gpts.api import router as gpts_router
 from onyx.server.kg.api import admin_router as kg_admin_router
 from onyx.server.long_term_logs.long_term_logs_api import (
     router as long_term_logs_router,
@@ -92,19 +99,23 @@ from onyx.server.manage.administrative import router as admin_router
 from onyx.server.manage.embedding.api import admin_router as embedding_admin_router
 from onyx.server.manage.embedding.api import basic_router as embedding_router
 from onyx.server.manage.get_state import router as state_router
+from onyx.server.manage.image_generation.api import (
+    admin_router as image_generation_admin_router,
+)
 from onyx.server.manage.llm.api import admin_router as llm_admin_router
 from onyx.server.manage.llm.api import basic_router as llm_router
 from onyx.server.manage.search_settings import router as search_settings_router
 from onyx.server.manage.slack_bot import router as slack_bot_management_router
 from onyx.server.manage.users import router as user_router
+from onyx.server.manage.web_search.api import (
+    admin_router as web_search_admin_router,
+)
 from onyx.server.middleware.latency_logging import add_latency_logging_middleware
 from onyx.server.middleware.rate_limiting import close_auth_limiter
 from onyx.server.middleware.rate_limiting import get_auth_rate_limiters
 from onyx.server.middleware.rate_limiting import setup_auth_limiter
 from onyx.server.onyx_api.ingestion import router as onyx_api_router
-from onyx.server.openai_assistants_api.full_openai_assistants_api import (
-    get_full_openai_assistants_api_router,
-)
+from onyx.server.pat.api import router as pat_router
 from onyx.server.query_and_chat.chat_backend import router as chat_router
 from onyx.server.query_and_chat.chat_backend_v0 import router as chat_v0_router
 from onyx.server.query_and_chat.query_backend import (
@@ -136,6 +147,13 @@ from shared_configs.configs import MULTI_TENANT
 from shared_configs.configs import POSTGRES_DEFAULT_SCHEMA
 from shared_configs.configs import SENTRY_DSN
 from shared_configs.contextvars import CURRENT_TENANT_ID_CONTEXTVAR
+
+warnings.filterwarnings(
+    "ignore", category=ResourceWarning, message=r"Unclosed client session"
+)
+warnings.filterwarnings(
+    "ignore", category=ResourceWarning, message=r"Unclosed connector"
+)
 
 logger = setup_logger()
 
@@ -255,9 +273,6 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     if OAUTH_CLIENT_ID and OAUTH_CLIENT_SECRET:
         logger.notice("Both OAuth Client ID and Secret are configured.")
 
-    if DISABLE_GENERATIVE_AI:
-        logger.notice("Generative AI Q&A disabled")
-
     # Initialize tracing if credentials are provided
     setup_braintrust_if_creds_available()
     setup_langfuse_if_creds_available()
@@ -324,6 +339,10 @@ def get_application(lifespan_override: Lifespan | None = None) -> FastAPI:
     application = FastAPI(
         title="Onyx Backend",
         version=__version__,
+        description="Onyx API for AI-powered chat with search, document indexing, agents, actions, and more",
+        servers=[
+            {"url": f"{WEB_DOMAIN.rstrip('/')}/api", "description": "Onyx API Server"}
+        ],
         lifespan=lifespan_override or lifespan,
     )
     if SENTRY_DSN:
@@ -365,25 +384,31 @@ def get_application(lifespan_override: Lifespan | None = None) -> FastAPI:
     )
     include_router_with_global_prefix_prepended(application, persona_router)
     include_router_with_global_prefix_prepended(application, admin_persona_router)
+    include_router_with_global_prefix_prepended(application, agents_router)
+    include_router_with_global_prefix_prepended(application, admin_agents_router)
     include_router_with_global_prefix_prepended(application, default_assistant_router)
     include_router_with_global_prefix_prepended(application, notification_router)
     include_router_with_global_prefix_prepended(application, tool_router)
     include_router_with_global_prefix_prepended(application, admin_tool_router)
+    include_router_with_global_prefix_prepended(application, oauth_config_router)
+    include_router_with_global_prefix_prepended(application, admin_oauth_config_router)
+    include_router_with_global_prefix_prepended(application, user_oauth_token_router)
     include_router_with_global_prefix_prepended(application, state_router)
     include_router_with_global_prefix_prepended(application, onyx_api_router)
-    include_router_with_global_prefix_prepended(application, gpts_router)
     include_router_with_global_prefix_prepended(application, settings_router)
     include_router_with_global_prefix_prepended(application, settings_admin_router)
     include_router_with_global_prefix_prepended(application, llm_admin_router)
     include_router_with_global_prefix_prepended(application, kg_admin_router)
     include_router_with_global_prefix_prepended(application, llm_router)
+    include_router_with_global_prefix_prepended(
+        application, image_generation_admin_router
+    )
     include_router_with_global_prefix_prepended(application, embedding_admin_router)
     include_router_with_global_prefix_prepended(application, embedding_router)
+    include_router_with_global_prefix_prepended(application, web_search_router)
+    include_router_with_global_prefix_prepended(application, web_search_admin_router)
     include_router_with_global_prefix_prepended(
         application, token_rate_limit_settings_router
-    )
-    include_router_with_global_prefix_prepended(
-        application, get_full_openai_assistants_api_router()
     )
     include_router_with_global_prefix_prepended(application, long_term_logs_router)
     include_router_with_global_prefix_prepended(application, api_key_router)
@@ -392,9 +417,8 @@ def get_application(lifespan_override: Lifespan | None = None) -> FastAPI:
     include_router_with_global_prefix_prepended(application, mcp_router)
     include_router_with_global_prefix_prepended(application, mcp_admin_router)
 
-    if AUTH_TYPE == AuthType.DISABLED:
-        # Server logs this during auth setup verification step
-        pass
+    if AUTH_TYPE != AuthType.DISABLED:
+        include_router_with_global_prefix_prepended(application, pat_router)
 
     if AUTH_TYPE == AuthType.BASIC or AUTH_TYPE == AuthType.CLOUD:
         include_auth_router_with_prefix(

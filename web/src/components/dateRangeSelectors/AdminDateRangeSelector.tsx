@@ -1,16 +1,11 @@
 import React, { memo, useState } from "react";
-import { Calendar } from "@/components/ui/calendar";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
-import { Button } from "@/components/ui/button";
+import Calendar from "@/refresh-components/Calendar";
+import Popover from "@/refresh-components/Popover";
+import Button from "@/refresh-components/buttons/Button";
 import { cn } from "@/lib/utils";
-import { CalendarIcon } from "lucide-react";
 import { format } from "date-fns";
 import { getXDaysAgo } from "./dateUtils";
-
+import { SvgCalendar } from "@opal/icons";
 export const THIRTY_DAYS = "30d";
 
 export type DateRangePickerValue = DateRange & {
@@ -53,30 +48,23 @@ export const AdminDateRangeSelector = memo(function AdminDateRangeSelector({
   return (
     <div className="grid gap-2">
       <Popover open={isOpen} onOpenChange={setIsOpen}>
-        <PopoverTrigger asChild>
+        <Popover.Trigger asChild>
           <Button
-            variant="outline"
-            className={cn(
-              "w-[300px] justify-start text-left font-normal",
-              !value && "text-muted-foreground"
-            )}
+            secondary
+            className={cn("justify-start", !value && "text-muted-foreground")}
+            leftIcon={SvgCalendar}
           >
-            <CalendarIcon className="mr-2 h-4 w-4" />
-            {value?.from ? (
-              value.to ? (
-                <>
-                  {format(value.from, "LLL dd, y")} -{" "}
-                  {format(value.to, "LLL dd, y")}
-                </>
-              ) : (
-                format(value.from, "LLL dd, y")
-              )
-            ) : (
-              <span>Pick a date range</span>
-            )}
+            {value?.from
+              ? value.to
+                ? `${format(value.from, "LLL dd, y")} - ${format(
+                    value.to,
+                    "LLL dd, y"
+                  )}`
+                : format(value.from, "LLL dd, y")
+              : "Pick a date range"}
           </Button>
-        </PopoverTrigger>
-        <PopoverContent className="w-auto p-0" align="start">
+        </Popover.Trigger>
+        <Popover.Content align="start">
           <Calendar
             initialFocus
             mode="range"
@@ -101,7 +89,7 @@ export const AdminDateRangeSelector = memo(function AdminDateRangeSelector({
             {presets.map((preset) => (
               <Button
                 key={preset.label}
-                variant="ghost"
+                internal
                 className="w-full justify-start"
                 onClick={() => {
                   onValueChange(preset.value);
@@ -111,7 +99,7 @@ export const AdminDateRangeSelector = memo(function AdminDateRangeSelector({
               </Button>
             ))}
           </div>
-        </PopoverContent>
+        </Popover.Content>
       </Popover>
     </div>
   );

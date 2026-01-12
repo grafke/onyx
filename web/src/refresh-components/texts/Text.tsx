@@ -1,3 +1,5 @@
+import type { HTMLAttributes } from "react";
+
 import { cn } from "@/lib/utils";
 
 const fonts = {
@@ -36,6 +38,10 @@ const colors = {
   text03: "text-text-03",
   text02: "text-text-02",
   text01: "text-text-01",
+  textLight03: "text-text-light-03",
+  textLight05: "text-text-light-05",
+  textDark03: "text-text-dark-03",
+  textDark05: "text-text-dark-05",
 
   inverted: {
     text05: "text-text-inverted-05",
@@ -43,10 +49,14 @@ const colors = {
     text03: "text-text-inverted-03",
     text02: "text-text-inverted-02",
     text01: "text-text-inverted-01",
+    textLight03: "text-text-light-03",
+    textLight05: "text-text-light-05",
+    textDark03: "text-text-dark-03",
+    textDark05: "text-text-dark-05",
   },
 };
 
-export interface TextProps extends React.HTMLAttributes<HTMLElement> {
+export interface TextProps extends Omit<HTMLAttributes<HTMLElement>, "as"> {
   nowrap?: boolean;
 
   // Fonts
@@ -76,6 +86,13 @@ export interface TextProps extends React.HTMLAttributes<HTMLElement> {
   text02?: boolean;
   text01?: boolean;
   inverted?: boolean;
+  textLight03?: boolean;
+  textLight05?: boolean;
+  textDark03?: boolean;
+  textDark05?: boolean;
+
+  // Tag type override
+  as?: "p" | "span" | "li";
 }
 
 export default function Text({
@@ -104,8 +121,14 @@ export default function Text({
   text02,
   text01,
   inverted,
+  textLight03,
+  textLight05,
+  textDark03,
+  textDark05,
   children,
   className,
+  as,
+  ...rest
 }: TextProps) {
   const font = headingH1
     ? "headingH1"
@@ -155,18 +178,34 @@ export default function Text({
           ? "text04"
           : text05
             ? "text05"
-            : "text05";
+            : textLight03
+              ? "textLight03"
+              : textLight05
+                ? "textLight05"
+                : textDark03
+                  ? "textDark03"
+                  : textDark05
+                    ? "textDark05"
+                    : "text05";
+
+  const Tag = as ?? "span";
 
   return (
-    <p
+    <Tag
+      {...rest}
       className={cn(
         fonts[font],
         inverted ? colors.inverted[color] : colors[color],
         nowrap && "whitespace-nowrap",
+        // NOTE: We want a small, horizontal padding applied to text components to visually
+        // complement the white-space implicit with line-height. We apply to the before and after
+        // pseudo-elements such that padding applied to the tag directly is additive making the
+        // likelihood of 2px offsets with other text elements much lower.
+        "before:content-[''] before:inline-block before:pl-[2px] after:content-[''] after:inline-block after:pr-[2px]",
         className
       )}
     >
       {children}
-    </p>
+    </Tag>
   );
 }

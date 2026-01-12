@@ -15,22 +15,28 @@ function FieldInputInner(
   ref: React.ForwardedRef<HTMLInputElement>
 ) {
   return (
-    <div className="flex flex-col gap-spacing-interline w-full">
-      <Text mainUiAction>{label}</Text>
+    <div className="flex flex-col gap-2 w-full">
+      <Text as="p" mainUiAction>
+        {label}
+      </Text>
       <input
         ref={ref}
         type="text"
         placeholder={placeholder}
         autoFocus
         className={cn(
-          "w-full p-spacing-interline rounded-08 border bg-background-neutral-00",
+          "w-full p-2 rounded-08 border bg-background-neutral-00",
           "text-text-05 placeholder:font-secondary-body placeholder:text-text-02",
           "focus:outline-none focus:ring-0 focus:border-theme-primary-05",
           className
         )}
         {...props}
       />
-      {description && <Text text03>{description}</Text>}
+      {description && (
+        <Text as="p" text03>
+          {description}
+        </Text>
+      )}
     </div>
   );
 }

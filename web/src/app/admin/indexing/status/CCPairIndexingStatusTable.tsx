@@ -17,30 +17,41 @@ import {
   ConnectorIndexingStatusLite,
   FederatedConnectorStatus,
 } from "@/lib/types";
+import type { Route } from "next";
 import { useRouter } from "next/navigation";
 import {
   FiChevronDown,
   FiChevronRight,
-  FiSettings,
   FiLock,
   FiUnlock,
   FiRefreshCw,
 } from "react-icons/fi";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
+import SimpleTooltip from "@/refresh-components/SimpleTooltip";
 import { SourceIcon } from "@/components/SourceIcon";
 import { getSourceDisplayName } from "@/lib/sources";
 import { usePaidEnterpriseFeaturesEnabled } from "@/components/settings/usePaidEnterpriseFeaturesEnabled";
 import { ConnectorCredentialPairStatus } from "../../connector/[ccPairId]/types";
 import { PageSelector } from "@/components/PageSelector";
 import { ConnectorStaggeredSkeleton } from "./ConnectorRowSkeleton";
-import Text from "@/refresh-components/texts/Text";
 import IconButton from "@/refresh-components/buttons/IconButton";
-import SvgSettings from "@/icons/settings";
+import { SvgSettings } from "@opal/icons";
+
+// Helper to handle navigation with cmd/ctrl+click support
+// NOTE: using this rather than Next/Link (or similar) since shadcn
+// table row components must be direct descendants of the table component
+// and putting the <Link> inside the <TableRow> would causes some parts of the
+// row to not navigate as expected.
+function navigateWithModifier(
+  e: React.MouseEvent,
+  url: string,
+  router: ReturnType<typeof useRouter>
+) {
+  if (e.metaKey || e.ctrlKey) {
+    window.open(url, "_blank");
+  } else {
+    router.push(url as Route);
+  }
+}
 
 function isFederatedConnectorStatus(
   status: ConnectorIndexingStatusLite | FederatedConnectorStatus
@@ -50,6 +61,7 @@ function isFederatedConnectorStatus(
 
 const NUMBER_OF_ROWS_PER_PAGE = 10;
 const NUMBER_OF_COLUMNS = 6;
+
 function SummaryRow({
   source,
   summary,
@@ -135,9 +147,10 @@ function ConnectorRow({
   const router = useRouter();
   const isPaidEnterpriseFeaturesEnabled = usePaidEnterpriseFeaturesEnabled();
 
-  const handleManageClick = (e: any) => {
-    e.stopPropagation();
-    router.push(`/admin/connector/${ccPairsIndexingStatus.cc_pair_id}`);
+  const connectorUrl = `/admin/connector/${ccPairsIndexingStatus.cc_pair_id}`;
+
+  const handleRowClick = (e: React.MouseEvent) => {
+    navigateWithModifier(e, connectorUrl, router);
   };
 
   return (
@@ -149,9 +162,7 @@ function ConnectorRow({
               ? "invisible !h-0 !-mb-10 !border-none"
               : "!border border-border dark:border-neutral-700"
           }  w-full cursor-pointer relative `}
-      onClick={() => {
-        router.push(`/admin/connector/${ccPairsIndexingStatus.cc_pair_id}`);
-      }}
+      onClick={handleRowClick}
     >
       <TableCell className="">
         <p className="lg:w-[200px] xl:w-[400px] inline-block ellipsis truncate">
@@ -198,18 +209,9 @@ function ConnectorRow({
       <TableCell>{ccPairsIndexingStatus.docs_indexed}</TableCell>
       <TableCell>
         {isEditable && (
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <div>
-                  <IconButton icon={SvgSettings} tertiary />
-                </div>
-              </TooltipTrigger>
-              <TooltipContent>
-                <Text inverted>Manage Connector</Text>
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
+          <SimpleTooltip tooltip="Manage Connector">
+            <IconButton icon={SvgSettings} tertiary />
+          </SimpleTooltip>
         )}
       </TableCell>
     </TableRow>
@@ -226,9 +228,10 @@ function FederatedConnectorRow({
   const router = useRouter();
   const isPaidEnterpriseFeaturesEnabled = usePaidEnterpriseFeaturesEnabled();
 
-  const handleManageClick = (e: any) => {
-    e.stopPropagation();
-    router.push(`/admin/federated/${federatedConnector.id}`);
+  const federatedUrl = `/admin/federated/${federatedConnector.id}`;
+
+  const handleRowClick = (e: React.MouseEvent) => {
+    navigateWithModifier(e, federatedUrl, router);
   };
 
   return (
@@ -240,9 +243,7 @@ function FederatedConnectorRow({
               ? "invisible !h-0 !-mb-10 !border-none"
               : "!border border-border dark:border-neutral-700"
           }  w-full cursor-pointer relative `}
-      onClick={() => {
-        router.push(`/admin/federated/${federatedConnector.id}`);
-      }}
+      onClick={handleRowClick}
     >
       <TableCell className="">
         <p className="lg:w-[200px] xl:w-[400px] inline-block ellipsis truncate">
@@ -262,19 +263,15 @@ function FederatedConnectorRow({
       )}
       <TableCell>N/A</TableCell>
       <TableCell>
-        <TooltipProvider>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <FiSettings
-                className="cursor-pointer"
-                onClick={handleManageClick}
-              />
-            </TooltipTrigger>
-            <TooltipContent>
-              <p>Manage Federated Connector</p>
-            </TooltipContent>
-          </Tooltip>
-        </TooltipProvider>
+        <IconButton
+          icon={SvgSettings}
+          tertiary
+          onClick={(e: React.MouseEvent) => {
+            e.stopPropagation();
+            navigateWithModifier(e, federatedUrl, router);
+          }}
+          tooltip="Manage Federated Connector"
+        />
       </TableCell>
     </TableRow>
   );
@@ -321,7 +318,16 @@ export function CCPairIndexingStatusTable({
       <TableBody>
         {ccPairsIndexingStatuses.map((ccPairStatus) => (
           <React.Fragment key={ccPairStatus.source}>
-            <br className="mt-4 dark:bg-neutral-700" />
+            <TableRow className="border-none">
+              <TableCell
+                colSpan={
+                  isPaidEnterpriseFeaturesEnabled
+                    ? NUMBER_OF_COLUMNS
+                    : NUMBER_OF_COLUMNS - 1
+                }
+                className="h-4 p-0"
+              />
+            </TableRow>
             <SummaryRow
               source={ccPairStatus.source}
               summary={ccPairStatus.summary}

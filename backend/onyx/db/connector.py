@@ -15,6 +15,7 @@ from onyx.connectors.models import InputType
 from onyx.db.enums import IndexingMode
 from onyx.db.models import Connector
 from onyx.db.models import ConnectorCredentialPair
+from onyx.db.models import FederatedConnector
 from onyx.db.models import IndexAttempt
 from onyx.kg.models import KGConnectorData
 from onyx.server.documents.models import ConnectorBase
@@ -25,10 +26,31 @@ from onyx.utils.logger import setup_logger
 logger = setup_logger()
 
 
+def check_federated_connectors_exist(db_session: Session) -> bool:
+    stmt = select(exists(FederatedConnector))
+    result = db_session.execute(stmt)
+    return result.scalar() or False
+
+
 def check_connectors_exist(db_session: Session) -> bool:
     # Connector 0 is created on server startup as a default for ingestion
     # it will always exist and we don't need to count it for this
     stmt = select(exists(Connector).where(Connector.id > 0))
+    result = db_session.execute(stmt)
+    return result.scalar() or False
+
+
+def check_user_files_exist(db_session: Session) -> bool:
+    """Check if any user files exist in the system.
+
+    This is used to determine if the search tool should be available
+    when there are no regular connectors but there are user files
+    (User Knowledge mode).
+    """
+    from onyx.db.models import UserFile
+    from onyx.db.enums import UserFileStatus
+
+    stmt = select(exists(UserFile).where(UserFile.status == UserFileStatus.COMPLETED))
     result = db_session.execute(stmt)
     return result.scalar() or False
 
