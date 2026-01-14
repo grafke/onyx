@@ -18,7 +18,7 @@ from onyx.utils.logger import setup_logger
 
 
 logger = setup_logger()
-FILE_TOKEN_COUNT_THRESHOLD = 50000
+FILE_TOKEN_COUNT_THRESHOLD = 5000000
 UNKNOWN_FILENAME = "[unknown_file]"  # More descriptive than empty string
 
 
